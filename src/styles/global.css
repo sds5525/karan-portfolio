@@ -1,0 +1,41 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+body {
+  transition: background-color 0.9s ease, color 0.9s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fi {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hf {
+  from {
+    opacity: 0;
+  }
+}
+
