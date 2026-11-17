@@ -1,0 +1,13 @@
+.work {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+

@@ -1,0 +1,87 @@
+.item {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: var(--s);
+  height: var(--s);
+  will-change: transform;
+  cursor: pointer;
+}
+
+.disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px #b9b9bd, 0 0 0 4px #77777c, 0 30px 60px -30px rgba(0, 0, 0, 0.5);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.discSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.discSvg text {
+  font: 400 5.2px var(--mono);
+  letter-spacing: 0.35em;
+  fill: #d9d7d2;
+  text-transform: uppercase;
+}
+
+.hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 19%;
+  height: 19%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 0 0 7px #c8c8cc, 0 0 0 9px #8d8d92 inset;
+}
+
+.dtitle {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 20%;
+  font: 400 clamp(26px, 5vw, 72px) / 0.9 var(--serif);
+  color: #f2efe8;
+  text-transform: uppercase;
+  transform: rotate(-7deg);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.note {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: min(320px, 70vw);
+  transform: translateX(-50%);
+  text-align: center;
+  margin-top: 14px;
+  pointer-events: none;
+}
+
+.note small {
+  display: block;
+  font: 400 10px var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.note p {
+  margin: 0;
+  font: 400 clamp(17px, 2vw, 28px) / 1.05 var(--serif);
+  text-transform: uppercase;
+}
+

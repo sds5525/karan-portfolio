@@ -1,0 +1,42 @@
+.info {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 14px;
+  width: min(320px, 42vw);
+  z-index: 200;
+  pointer-events: none;
+}
+
+.info h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(34px, 4.4vw, 60px);
+  line-height: 0.95;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+  font-size: clamp(14px, 1.4vw, 19px);
+  text-align: right;
+}
+
+.row b {
+  font: 400 10px var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: left;
+  padding-top: 5px;
+}
+
+@media (max-width: 760px) {
+  .info {
+    width: 56vw;
+  }
+}
+

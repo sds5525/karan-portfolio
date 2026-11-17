@@ -1,0 +1,146 @@
+.brand {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  font-family: var(--serif);
+  font-size: 24px;
+  letter-spacing: 0.02em;
+  color: inherit;
+  text-decoration: none;
+}
+
+.nav {
+  position: fixed;
+  top: auto;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  right: auto;
+  width: max-content;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid var(--glassl);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  z-index: 300;
+}
+
+.nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.navLink,
+.idxButton {
+  display: block;
+  padding: 9px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  text-decoration: none;
+  transition: background 0.25s;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+.navLink:hover,
+.idxButton:hover {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.navLinkActive {
+  background: rgba(127, 127, 127, 0.22);
+}
+
+.idx {
+  position: relative;
+}
+
+.idxList {
+  display: none;
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  border-radius: 22px;
+  padding: 10px 16px;
+  background: var(--glassd);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid var(--glassl);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+  list-style: none;
+  min-width: 220px;
+}
+
+.idxOpen .idxList {
+  display: block;
+}
+
+.idxItem {
+  padding: 4px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.idxItem a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.idxItem a:hover {
+  text-decoration: underline;
+}
+
+.idxItem span {
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.ctr {
+  position: fixed;
+  left: 14px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  font: 400 11px var(--mono);
+  z-index: 200;
+  color: var(--mute);
+}
+
+.hint {
+  position: fixed;
+  right: 16px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  font: 400 10px var(--mono);
+  letter-spacing: 0.16em;
+  color: var(--mute);
+  z-index: 200;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .hint {
+    display: none;
+  }
+}
+
