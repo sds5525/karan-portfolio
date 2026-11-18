@@ -85,16 +85,6 @@ export default function HomeView() {
     particlesRef.current?.setPointer(-999, -999);
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = () => {
-      particlesRef.current?.setCustomImage(img);
-    };
-    img.src = URL.createObjectURL(file);
-  };
-
   const handleViewWorkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     if (!particlesRef.current || particlesRef.current.isIntroActive()) {
@@ -119,16 +109,18 @@ export default function HomeView() {
       <canvas ref={canvasRef} id="cv" className={styles.cv} />
       <span className={styles.hn}>Karan S Achar</span>
       <span className={styles.hr}>Creative Developer</span>
+
+      <div className={styles.credit}>
+        <a
+          href="https://sketchfab.com/3d-models/king-mountain-cairn-point-cloud-surroundings-bbfa503fded6440da262482f148dd974"
+          target="_blank"
+          rel="noopener"
+        >
+          Cairn scan — SVickers · CC BY 4.0
+        </a>
+      </div>
+
       <div className={styles.hbar}>
-        <label>
-          Use your photo
-          <input
-            type="file"
-            id="photo"
-            accept="image/*"
-            onChange={handlePhotoChange}
-          />
-        </label>
         <a href="/work" onClick={handleViewWorkClick}>
           View work →
         </a>

@@ -6,8 +6,62 @@
   cursor: grab;
 }
 
-.stage {
+.captionOverlay {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(680px, 92vw);
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  pointer-events: none;
+  z-index: 100;
+  text-align: center;
+  will-change: opacity;
 }
 
+.captionItem {
+  flex: 1;
+  max-width: 320px;
+}
+
+.captionMeta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stars {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--fg);
+}
+
+.source {
+  font: 400 10px var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.quote {
+  margin: 0;
+  font: 400 clamp(16px, 1.8vw, 24px) / 1.15 var(--serif);
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+@media (max-width: 760px) {
+  .captionOverlay {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .captionItem:nth-child(n + 2) {
+    display: none;
+  }
+}

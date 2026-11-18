@@ -3,9 +3,21 @@ import { Link, NavLink, Outlet, useLocation, useOutletContext } from 'react-rout
 import { projects } from '../../data/projects';
 import styles from './Layout.module.css';
 
+const STATUS_WORDS = ['Developing', 'Splicing', 'Spooling', 'Rewinding', 'Projecting'] as const;
+let statusWordIndex = 0;
+
+export function getNextStatusWord(): string {
+  const word = STATUS_WORDS[statusWordIndex];
+  statusWordIndex = (statusWordIndex + 1) % STATUS_WORDS.length;
+  return word;
+}
+
 export interface WorkContextType {
   counterText: string;
   setCounterText: React.Dispatch<React.SetStateAction<string>>;
+  transitionStatus: string | null;
+  triggerTransition: () => string;
+  finishTransition: () => void;
 }
 
 export function useWorkContext() {
@@ -16,7 +28,18 @@ export default function Layout() {
   const location = useLocation();
   const [isIndexOpen, setIsIndexOpen] = useState(false);
   const [counterText, setCounterText] = useState('01 / 06');
+  const [transitionStatus, setTransitionStatus] = useState<string | null>(null);
   const idxRef = useRef<HTMLDivElement>(null);
+
+  const triggerTransition = React.useCallback(() => {
+    const word = getNextStatusWord();
+    setTransitionStatus(word);
+    return word;
+  }, []);
+
+  const finishTransition = React.useCallback(() => {
+    setTransitionStatus(null);
+  }, []);
 
   const isHome = location.pathname === '/';
   const isWork = location.pathname === '/work';
@@ -69,48 +92,58 @@ export default function Layout() {
       </Link>
 
       <nav className={styles.nav}>
-        <NavLink
-          to="/work"
-          state={
-            isHome
-              ? { fromHome: true }
-              : currentProjectIndex !== -1
-              ? { initialIndex: currentProjectIndex }
-              : undefined
-          }
-          className={({ isActive }) =>
-            `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
-          }
-        >
-          Work
-        </NavLink>
+        {transitionStatus ? (
+          <div className={styles.transitionStatus}>
+            <span className={styles.spinner} />
+            <span>{transitionStatus}</span>
+          </div>
+        ) : (
+          <>
+            <NavLink
+              to="/work"
+              end
+              state={
+                isHome
+                  ? { fromHome: true }
+                  : currentProjectIndex !== -1
+                  ? { initialIndex: currentProjectIndex }
+                  : undefined
+              }
+              className={({ isActive }) =>
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+              }
+            >
+              Work
+            </NavLink>
 
-        <div
-          ref={idxRef}
-          className={`${styles.idx} ${isIndexOpen ? styles.idxOpen : ''}`}
-        >
-          <button
-            type="button"
-            aria-expanded={isIndexOpen}
-            className={styles.idxButton}
-            onClick={() => setIsIndexOpen((prev) => !prev)}
-          >
-            Index ▾
-          </button>
-          <ul className={styles.idxList}>
-            {projects.map((project) => (
-              <li key={project.slug} className={styles.idxItem}>
-                <Link
-                  to={`/work/${project.slug}`}
-                  onClick={() => setIsIndexOpen(false)}
-                >
-                  {project.title}
-                </Link>
-                <span>{project.year}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+            <div
+              ref={idxRef}
+              className={`${styles.idx} ${isIndexOpen ? styles.idxOpen : ''}`}
+            >
+              <button
+                type="button"
+                aria-expanded={isIndexOpen}
+                className={styles.idxButton}
+                onClick={() => setIsIndexOpen((prev) => !prev)}
+              >
+                Index ▾
+              </button>
+              <ul className={styles.idxList}>
+                {projects.map((project) => (
+                  <li key={project.slug} className={styles.idxItem}>
+                    <Link
+                      to={`/work/${project.slug}`}
+                      onClick={() => setIsIndexOpen(false)}
+                    >
+                      {project.title}
+                    </Link>
+                    <span>{project.year}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </nav>
 
       {isWork && (
@@ -120,7 +153,17 @@ export default function Layout() {
         </>
       )}
 
-      <Outlet context={{ counterText, setCounterText } satisfies WorkContextType} />
+      <Outlet
+        context={
+          {
+            counterText,
+            setCounterText,
+            transitionStatus,
+            triggerTransition,
+            finishTransition,
+          } satisfies WorkContextType
+        }
+      />
     </>
   );
 }

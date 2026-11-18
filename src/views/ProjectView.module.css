@@ -1,119 +1,688 @@
 .project {
-  position: fixed;
-  inset: 0;
-  overflow: auto;
-  padding: 84px 24px 110px;
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  overflow-x: hidden;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-.pgrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
+.whiteTransitionOverlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  z-index: 500;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.clipSvg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Header Section (First Viewport) */
+.header {
+  position: relative;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 100px 24px 48px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
 }
 
-.meta {
-  font: 400 11px var(--mono);
-  letter-spacing: 0.16em;
+.title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(48px, 7vw, 120px);
+  font-weight: 400;
+  line-height: 0.9;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.titleLineMask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.04em;
+}
+
+.titleLine {
+  display: block;
+  transform: translateY(100%);
+  will-change: transform;
+}
+
+/* Credits Line */
+.creditsLine {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 16px 28px;
+  margin-top: 24px;
+  text-align: center;
+  opacity: 0;
+}
+
+.creditItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.creditLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant: all-small-caps;
+  letter-spacing: 0.14em;
   color: var(--mute);
 }
 
-.pgrid h1 {
-  font: 400 clamp(44px, 8vw, 110px) / 0.9 var(--serif);
-  text-transform: uppercase;
-  margin: 12px 0 24px;
+.creditNames {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--fg);
 }
 
-.pgrid p {
-  font-size: 18px;
-  line-height: 1.5;
-  max-width: 46ch;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid var(--line);
-  padding: 8px 0;
-  font-size: clamp(14px, 1.4vw, 19px);
-  text-align: right;
-  max-width: 420px;
-}
-
-.row b {
-  font: 400 10px var(--mono);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  text-align: left;
-  padding-top: 5px;
-}
-
-.firstRow {
-  margin-top: 24px;
-}
-
-.pdisc {
+/* Full-width Meta Rows */
+.metaContainer {
   position: relative;
-  width: min(44vw, 70vh);
-  aspect-ratio: 1;
-  margin: auto;
-  --s: min(44vw, 70vh);
-  animation: spin 40s linear infinite;
-}
-
-.pdiscItem {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
-  left: 0;
-  top: 0;
-  cursor: default;
-  transform: none;
+  max-width: 1200px;
+  margin-top: 48px;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.pnav {
+.metaRow {
+  position: relative;
   display: flex;
   justify-content: space-between;
-  max-width: 1200px;
-  margin: 48px auto 0;
-  font: 400 12px var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
+  align-items: center;
+  padding: 14px 0;
 }
 
-.pnav a {
+.metaBorder,
+.metaBorderBottom {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.metaBorderBottom {
+  top: auto;
+  bottom: 0;
+}
+
+.metaLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--mute);
+  opacity: 0;
+}
+
+.metaValue {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--fg);
+  text-align: right;
+  opacity: 0;
+}
+
+/* Boxed Links */
+.boxedLinksOuter {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  opacity: 0;
+}
+
+.boxedLinksBox {
+  position: relative;
+  display: inline-flex;
+  padding: 16px 28px;
+  border: 1px dashed currentColor;
+}
+
+.cornerCross {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.crossTL {
+  top: -6px;
+  left: -5px;
+}
+
+.crossTR {
+  top: -6px;
+  right: -5px;
+}
+
+.crossBL {
+  bottom: -6px;
+  left: -5px;
+}
+
+.crossBR {
+  bottom: -6px;
+  right: -5px;
+}
+
+.boxedLinksList {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.boxedLink {
+  display: inline-block;
+  padding: 6px 14px;
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  font-family: var(--serif);
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: inherit;
   text-decoration: none;
+  background: none;
+  border-left: none;
+  border-right: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-.pnav a:hover {
-  text-decoration: underline;
+.boxedLink:hover {
+  opacity: 0.65;
 }
 
+/* Torn-edge Hero Reveal Container */
+.heroRevealContainer {
+  position: relative;
+  width: 100%;
+  height: clamp(450px, 75vh, 900px);
+  margin-top: 40px;
+  overflow: hidden;
+  will-change: clip-path;
+  background: #000000;
+}
+
+.heroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.heroPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.heroPlaceholderTitle {
+  font-family: var(--serif);
+  font-size: clamp(36px, 6vw, 80px);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 0 20px;
+}
+
+/* 2. Pinned Hero Quote Section (250vh / 180vh mobile) */
+.quotePinSection {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quoteHeroBg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.quoteHeroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.quoteHeroPlaceholder {
+  width: 100%;
+  height: 100%;
+}
+
+.quoteHeroOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.quoteGridLines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.quoteLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.quoteWordsContainer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.quoteWordPlacement {
+  position: absolute;
+  transform: translateY(-50%);
+  font-family: var(--serif);
+  font-size: clamp(40px, 6vw, 96px);
+  text-transform: uppercase;
+  color: #ffffff;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wordLeft {
+  left: 8%;
+  text-align: left;
+}
+
+.wordRight {
+  right: 8%;
+  text-align: right;
+}
+
+.quoteWordMask {
+  display: inline-block;
+  overflow: hidden;
+  padding-bottom: 0.05em;
+}
+
+.quoteWordInner {
+  display: inline-block;
+  transform: translateY(100%);
+  will-change: transform;
+}
+
+/* Centered Boxed "WATCH REEL" */
+.watchReelCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  color: #ffffff;
+}
+
+.watchReelBtn {
+  color: #ffffff;
+  letter-spacing: 0.1em;
+}
+
+/* Fullscreen Video Reel Overlay */
+.videoOverlay {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.videoHeader,
+.videoFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  z-index: 10;
+}
+
+.videoBtn {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  transition: opacity 0.2s ease;
+}
+
+.videoBtn:hover {
+  opacity: 0.6;
+}
+
+.videoTitle,
+.videoTimer {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.videoPlayerContainer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.videoElement {
+  max-width: 90vw;
+  max-height: 75vh;
+  object-fit: contain;
+  cursor: pointer;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+
+/* 3. Summary & Recognition Section */
+.summarySection {
+  position: relative;
+  width: 100%;
+  padding: 140px 24px 120px;
+}
+
+.summaryContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 60px;
+}
+
+.summaryLeft {
+  flex: 1;
+}
+
+.summaryParagraph {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 32ch;
+  color: inherit;
+  margin: 0;
+}
+
+.summaryRight {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.recognitionList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: right;
+}
+
+.recognitionItem {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant: all-small-caps;
+  letter-spacing: 0.12em;
+  color: inherit;
+}
+
+/* 4. Next Project Section (Grey Section, ~200vh pin) */
+.nextProjectSection {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nextGridLines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.nextLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(17, 17, 17, 0.3);
+}
+
+.nextTitlesContainer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.nextTitleLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  font-family: var(--serif);
+  font-size: clamp(40px, 5vw, 80px);
+  text-transform: uppercase;
+  color: #111111;
+  text-align: center;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.nextDiscWrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(34vw, 320px);
+  aspect-ratio: 1;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  will-change: transform;
+}
+
+.nextDiscItem {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.nextDiscFace {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nextDiscTitle {
+  font-family: var(--serif);
+  font-size: clamp(14px, 2vw, 22px);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.nextDiscRim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 10px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.nextDiscHole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: #d6d3cf;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.nextDiscWobbleSvg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 130%;
+  height: 130%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.portfolioMark {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(17, 17, 17, 0.45);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Mobile Responsive (< 760px) */
 @media (max-width: 760px) {
-  .pgrid {
-    grid-template-columns: 1fr;
+  .header {
+    padding: 80px 16px 32px;
   }
-  .pdisc {
-    width: 80vw;
-    --s: 80vw;
-  }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .pdisc {
-    animation: none;
+  .title {
+    font-size: clamp(38px, 9vw, 68px);
+  }
+
+  .metaRow {
+    padding: 10px 0;
+  }
+
+  .boxedLinksBox {
+    padding: 12px 18px;
+  }
+
+  .boxedLink {
+    font-size: 18px;
+    padding: 4px 10px;
+  }
+
+  .heroRevealContainer {
+    height: clamp(340px, 50vh, 500px);
+  }
+
+  .quoteWordPlacement {
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    text-align: center;
+    font-size: clamp(32px, 8vw, 56px);
+  }
+
+  .summarySection {
+    padding: 80px 16px 60px;
+  }
+
+  .summaryContainer {
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  .summaryRight {
+    justify-content: flex-start;
+  }
+
+  .recognitionList {
+    text-align: left;
+  }
+
+  .nextDiscWrapper {
+    width: min(65vw, 240px);
+  }
+
+  .nextTitleLine {
+    font-size: clamp(32px, 7vw, 52px);
+  }
+
+  .portfolioMark {
+    bottom: 16px;
+    right: 16px;
+    font-size: 9px;
+  }
+
+  .videoHeader,
+  .videoFooter {
+    padding: 16px 20px;
   }
 }

@@ -1,47 +1,67 @@
-import { useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { projects } from '../data/projects';
 import { useWorkContext } from '../components/Layout/Layout';
 import { InfoPanel } from '../components/InfoPanel/InfoPanel';
-import { Disc } from '../components/Disc/Disc';
-import { DiscEntrance } from '../components/DiscEntrance/DiscEntrance';
+import { DiscScene } from '../components/DiscScene/DiscScene';
 import { useCarousel } from '../hooks/useCarousel';
 import styles from './WorkView.module.css';
 
 export default function WorkView() {
   const { setCounterText } = useWorkContext();
   const location = useLocation();
-  const fromHome = Boolean((location.state as { fromHome?: boolean } | null)?.fromHome);
-  const [showEntrance, setShowEntrance] = useState(fromHome);
+  const navigate = useNavigate();
+
+  // Capture fromHome once on mount so it stays stable for the life of the view
+  const fromHomeRef = useRef(Boolean((location.state as { fromHome?: boolean } | null)?.fromHome));
+  const fromHome = fromHomeRef.current;
+
+  // Clear location.state so refresh doesn't replay entrance
+  useEffect(() => {
+    if (fromHome) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [fromHome, location.pathname, navigate]);
 
   const workRef = useRef<HTMLElement>(null);
   const infoRef = useRef<HTMLElement>(null);
-  const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const captionRef = useRef<HTMLDivElement>(null);
 
-  const { activeIndex, handleDiscClick } = useCarousel({
+  const { posRef, targetRef, movedRef, activeIndex, onActiveIndexChange } = useCarousel({
     workRef,
     infoRef,
-    itemRefs,
     setCounterText,
+    fromHome,
   });
+
+  const activeProject = projects[activeIndex];
+  const testimonials = activeProject.testimonials ?? [
+    { rating: 5, source: activeProject.by, quote: activeProject.note },
+  ];
 
   return (
     <section ref={workRef} className={styles.work} id="work">
-      <InfoPanel ref={infoRef} project={projects[activeIndex]} />
-      <div className={styles.stage} id="stage">
-        {projects.map((project, i) => (
-          <Disc
-            key={project.slug}
-            ref={(el) => {
-              itemRefs.current[i] = el;
-            }}
-            project={project}
-            index={i}
-            onClick={() => handleDiscClick(i)}
-          />
+      <InfoPanel ref={infoRef} project={activeProject} />
+      <DiscScene
+        projects={projects}
+        posRef={posRef}
+        targetRef={targetRef}
+        movedRef={movedRef}
+        fromHome={fromHome}
+        captionRef={captionRef}
+        onActiveIndexChange={onActiveIndexChange}
+      />
+      <div ref={captionRef} className={styles.captionOverlay}>
+        {testimonials.slice(0, 2).map((t, i) => (
+          <div key={i} className={styles.captionItem}>
+            <div className={styles.captionMeta}>
+              <span className={styles.stars}>{'★'.repeat(t.rating ?? 5)}</span>
+              <span className={styles.source}>{t.source}</span>
+            </div>
+            <p className={styles.quote}>“{t.quote}”</p>
+          </div>
         ))}
       </div>
-      {showEntrance && <DiscEntrance onComplete={() => setShowEntrance(false)} />}
     </section>
   );
 }

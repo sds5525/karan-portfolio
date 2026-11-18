@@ -1,4 +1,5 @@
 import logoSrc from '../../assets/masala-logo.png';
+import { loadCloud, type PointCloud } from './cloud';
 
 interface Particle {
   x: number;
@@ -11,6 +12,7 @@ interface Particle {
   dl: number;
   ld?: number;
   la?: number;
+  pi?: number;
 }
 
 const SESSION_KEY = 'portfolio_home_intro_played';
@@ -67,7 +69,6 @@ export class HomeParticles {
   private running = false;
   private mx = -999;
   private my = -999;
-  private custom: HTMLImageElement | null = null;
   public intro = true;
   private burst = false;
   private logoC: HTMLCanvasElement | null = null;
@@ -78,6 +79,7 @@ export class HomeParticles {
   private leaving = false;
   private tL = 0;
   private rafId = 0;
+  private cloud: PointCloud | null = null;
 
   constructor(canvas: HTMLCanvasElement, onLeaveComplete?: () => void) {
     this.canvas = canvas;
@@ -88,6 +90,18 @@ export class HomeParticles {
     if (still || hasPlayedHomeIntro()) {
       this.intro = false;
     }
+
+    // Start loading the point cloud; does not block the intro hold
+    loadCloud()
+      .then((cloud) => {
+        this.cloud = cloud;
+        if (this.PS.length > 0) {
+          this.retarget();
+        }
+      })
+      .catch((err) => {
+        console.warn('Point cloud load failed, falling back to silhouette:', err);
+      });
   }
 
   public isIntroActive(): boolean {
@@ -113,63 +127,115 @@ export class HomeParticles {
     o.height = this.H;
     const g = o.getContext('2d')!;
     g.fillStyle = '#fff';
-    if (this.custom) {
-      const sc = Math.min(
-        (this.W * 0.9) / this.custom.width,
-        (this.H * 0.96) / this.custom.height
+    const s = this.H;
+    const x = this.W / 2;
+    let q = 7;
+    const r = () => (q = (q * 16807) % 2147483647) / 2147483647;
+    g.beginPath();
+    g.ellipse(x, 0.37 * s, 0.235 * s, 0.27 * s, 0, 0, 7);
+    g.fill();
+    for (let a = 0; a < 56; a++) {
+      const t = Math.PI * (0.85 + (a / 55) * 1.3);
+      g.beginPath();
+      g.arc(
+        x + Math.cos(t) * 0.24 * s,
+        0.37 * s + Math.sin(t) * 0.275 * s,
+        0.034 * s * (0.6 + r() * 0.9),
+        0,
+        7
       );
-      const w = this.custom.width * sc;
-      const h = this.custom.height * sc;
-      g.drawImage(this.custom, (this.W - w) / 2, this.H - h, w, h);
-    } else {
-      const s = this.H;
-      const x = this.W / 2;
-      let q = 7;
-      const r = () => (q = (q * 16807) % 2147483647) / 2147483647;
-      g.beginPath();
-      g.ellipse(x, 0.37 * s, 0.235 * s, 0.27 * s, 0, 0, 7);
-      g.fill();
-      for (let a = 0; a < 56; a++) {
-        const t = Math.PI * (0.85 + (a / 55) * 1.3);
-        g.beginPath();
-        g.arc(
-          x + Math.cos(t) * 0.24 * s,
-          0.37 * s + Math.sin(t) * 0.275 * s,
-          0.034 * s * (0.6 + r() * 0.9),
-          0,
-          7
-        );
-        g.fill();
-      }
-      g.fillRect(x - 0.125 * s, 0.55 * s, 0.25 * s, 0.2 * s);
-      g.beginPath();
-      g.moveTo(x - 0.125 * s, 0.68 * s);
-      g.quadraticCurveTo(x - 0.2 * s, 0.72 * s, x - 0.35 * s, 0.8 * s);
-      g.quadraticCurveTo(x - 0.55 * s, 0.9 * s, x - 0.6 * s, s);
-      g.lineTo(x + 0.6 * s, s);
-      g.quadraticCurveTo(x + 0.55 * s, 0.9 * s, x + 0.35 * s, 0.8 * s);
-      g.quadraticCurveTo(x + 0.2 * s, 0.72 * s, x + 0.125 * s, 0.68 * s);
       g.fill();
     }
+    g.fillRect(x - 0.125 * s, 0.55 * s, 0.25 * s, 0.2 * s);
+    g.beginPath();
+    g.moveTo(x - 0.125 * s, 0.68 * s);
+    g.quadraticCurveTo(x - 0.2 * s, 0.72 * s, x - 0.35 * s, 0.8 * s);
+    g.quadraticCurveTo(x - 0.55 * s, 0.9 * s, x - 0.6 * s, s);
+    g.lineTo(x + 0.6 * s, s);
+    g.quadraticCurveTo(x + 0.55 * s, 0.9 * s, x + 0.35 * s, 0.8 * s);
+    g.quadraticCurveTo(x + 0.2 * s, 0.72 * s, x + 0.125 * s, 0.68 * s);
+    g.fill();
+
     const d = g.getImageData(0, 0, this.W, this.H).data;
     const c: number[] = [];
     for (let y = 0; y < this.H; y += 2) {
       for (let x = 0; x < this.W; x += 2) {
         const k = (y * this.W + x) * 4;
-        const w = this.custom
-          ? (d[k + 3] / 255) * ((d[k] + d[k + 1] + d[k + 2]) / 765)
-          : d[k + 3] / 255;
+        const w = d[k + 3] / 255;
         if (w > 0.15) c.push(x, y, w);
       }
     }
     return c;
   }
 
+  private updateCloudTargets(elapsed: number, still: boolean): void {
+    if (!this.cloud) return;
+    const angle = still ? 0 : elapsed * 0.00012;
+    const cosY = Math.cos(angle);
+    const sinY = Math.sin(angle);
+    const tiltX = (22 * Math.PI) / 180;
+    const cosX = Math.cos(tiltX);
+    const sinX = Math.sin(tiltX);
+
+    const fov = 2.2;
+    const scale = Math.min(this.W * 0.62, this.H * 1.1);
+    const scaleFov = scale * fov;
+    const cx = this.W / 2;
+    const cy = this.H * 0.55;
+    const pos = this.cloud.pos;
+
+    for (let i = 0; i < this.PS.length; i++) {
+      const p = this.PS[i];
+      if (p.pi === undefined) continue;
+
+      const idx = p.pi * 3;
+      const x0 = pos[idx];
+      const y0 = pos[idx + 1];
+      const z0 = pos[idx + 2];
+
+      // Rotate around Y by angle
+      const x1 = x0 * cosY + z0 * sinY;
+      const y1 = y0;
+      const z1 = -x0 * sinY + z0 * cosY;
+
+      // Rotate around X by 22° tilt
+      const x2 = x1;
+      const y2 = y1 * cosX - z1 * sinX;
+      const z2 = y1 * sinX + z1 * cosX;
+
+      // Project
+      const zp = z2 + fov;
+      const invZ = 1 / zp;
+      p.tx = cx + x2 * scaleFov * invZ;
+      p.ty = cy - y2 * scaleFov * invZ;
+
+      // Depth: 0 at back to 1 at front (closer to camera has smaller z2)
+      const depth = Math.max(0, Math.min(1, 0.5 - z2));
+      p.b = 0.25 + 0.75 * depth;
+
+      if (still) {
+        p.x = p.tx;
+        p.y = p.ty;
+      }
+    }
+  }
+
   private retarget(): void {
+    const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+    if (this.cloud) {
+      const count = this.cloud.count;
+      this.PS.forEach((p) => {
+        p.pi = Math.floor(Math.random() * count);
+      });
+      this.updateCloudTargets(0, still);
+      return;
+    }
+
+    // Fallback: procedural silhouette
     const c = this.silhouette();
     const m = c.length / 3;
     if (!m) return;
-    const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
     this.PS.forEach((p) => {
       const k = ((Math.random() * m) | 0) * 3;
       p.tx = c[k] + Math.random() * 2;
@@ -212,7 +278,7 @@ export class HomeParticles {
   private initP(): void {
     this.size();
     this.PS = [];
-    const n = window.innerWidth < 700 ? 5500 : 11000;
+    const n = window.innerWidth < 700 ? 9000 : 24000;
     const lg = this.intro;
     if (lg) this.makeLogo();
     const m = this.logoPts.length / 2;
@@ -285,6 +351,13 @@ export class HomeParticles {
       });
       this.t0 = performance.now();
       t = 0;
+    }
+
+    const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+    // Every frame before physics: rotate 3D point cloud & project to moving targets
+    if (this.cloud) {
+      this.updateCloudTargets(t, still);
     }
 
     const g2 = this.ctx;
@@ -403,11 +476,4 @@ export class HomeParticles {
     this.mx = x;
     this.my = y;
   }
-
-  public setCustomImage(img: HTMLImageElement): void {
-    this.custom = img;
-    this.retarget();
-    this.t0 = performance.now() - 2000;
-  }
 }
-

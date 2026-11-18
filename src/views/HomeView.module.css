@@ -36,9 +36,32 @@
 
 .leaving .hn,
 .leaving .hr,
-.leaving .hbar {
+.leaving .hbar,
+.leaving .credit {
   opacity: 0 !important;
   animation: none !important;
+}
+
+.credit {
+  position: absolute;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  font: 400 10px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  opacity: 0;
+  animation: fi 1.2s var(--hd, 1.6s) forwards;
+  z-index: 2;
+}
+
+.credit a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.credit a:hover {
+  text-decoration: underline;
 }
 
 .hbar {
@@ -55,15 +78,6 @@
   z-index: 2;
   opacity: 0;
   animation: fi 1s var(--hd, 1.6s) forwards;
-}
-
-.hbar label {
-  cursor: pointer;
-  color: #8d8b92;
-}
-
-.hbar input {
-  display: none;
 }
 
 .hbar a {
@@ -86,4 +100,17 @@
     right: 16px;
   }
 }
+
+@keyframes fi {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hf {
+  from {
+    opacity: 0;
+  }
+}
+
 
