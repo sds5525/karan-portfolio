@@ -9,6 +9,7 @@
   letter-spacing: 0.02em;
   color: inherit;
   text-decoration: none;
+  transition: color 0.3s ease;
 }
 
 .nav {
@@ -31,6 +32,39 @@
   border: 1px solid var(--glassl);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   z-index: 300;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+:global(body.tone-light) .brand {
+  color: #111111;
+}
+
+:global(body.tone-light) .nav {
+  background: rgba(255, 255, 255, 0.55);
+  color: #111111;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+:global(body.tone-light) .navLink,
+:global(body.tone-light) .idxButton,
+:global(body.tone-light) .transitionStatus {
+  color: #111111;
+}
+
+:global(body.tone-dark) .brand {
+  color: #eceae6;
+}
+
+:global(body.tone-dark) .nav {
+  background: rgba(255, 255, 255, 0.08);
+  color: #eceae6;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+:global(body.tone-dark) .navLink,
+:global(body.tone-dark) .idxButton,
+:global(body.tone-dark) .transitionStatus {
+  color: #eceae6;
 }
 
 .nav::before {

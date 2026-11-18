@@ -96,7 +96,7 @@ export class DiscEntranceEffect {
     const H = window.innerHeight;
     this.ctx.clearRect(0, 0, W, H);
 
-    const tv = matchMedia('(prefers-color-scheme:dark)').matches ? 236 : 17;
+    const tv = 236;
     const v = Math.round(255 + (tv - 255) * Math.min(1, t / 900));
     this.ctx.fillStyle = `rgb(${v},${v},${v})`;
     this.ctx.globalAlpha = Math.max(0, Math.min(1, 1 - (t - 1250) / 650));

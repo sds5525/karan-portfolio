@@ -1,10 +1,13 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Canvas } from '@react-three/fiber';
+import { Environment } from '@react-three/drei';
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { projects } from '../data/projects';
 import { useWorkContext } from '../components/Layout/Layout';
+import { SingleDisc } from '../components/DiscScene/SingleDisc';
 import styles from './ProjectView.module.css';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -91,62 +94,6 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-// Boiling SVG Wobble Outline around the Next Disc
-function WobbleOutline({ radius }: { radius: number }) {
-  const [loopsPoints, setLoopsPoints] = useState<string[]>(['', '', '']);
-
-  useEffect(() => {
-    const baseRadii = [1.03, 1.07, 1.11];
-    const update = () => {
-      const newPoints = baseRadii.map((br) => {
-        const baseR = br * radius;
-        const amp = 0.025 * baseR;
-        const f1 = 2 + Math.floor(Math.random() * 4);
-        const f2 = 2 + Math.floor(Math.random() * 4);
-        const p1 = Math.random() * Math.PI * 2;
-        const p2 = Math.random() * Math.PI * 2;
-        const cx = (Math.random() - 0.5) * 0.03 * radius;
-        const cy = (Math.random() - 0.5) * 0.03 * radius;
-
-        const pts: string[] = [];
-        for (let j = 0; j < 120; j++) {
-          const theta = (j / 120) * Math.PI * 2;
-          const noise = (Math.sin(f1 * theta + p1) + Math.sin(f2 * theta + p2)) * 0.5 * amp;
-          const r = baseR + noise;
-          const x = cx + r * Math.cos(theta);
-          const y = cy + r * Math.sin(theta);
-          pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
-        }
-        return pts.join(' ');
-      });
-      setLoopsPoints(newPoints);
-    };
-
-    update();
-    const interval = setInterval(update, 110);
-    return () => clearInterval(interval);
-  }, [radius]);
-
-  return (
-    <svg
-      viewBox="-250 -250 500 500"
-      className={styles.nextDiscWobbleSvg}
-      aria-hidden="true"
-    >
-      {loopsPoints.map((pts, i) => (
-        <polygon
-          key={i}
-          points={pts}
-          fill="none"
-          stroke="#111"
-          strokeWidth="1.5"
-          strokeOpacity="0.85"
-        />
-      ))}
-    </svg>
-  );
 }
 
 // Fullscreen Video Reel Overlay
@@ -286,7 +233,7 @@ export default function ProjectView() {
   // Next Project section refs
   const nextSectionRef = useRef<HTMLElement | null>(null);
   const nextLinesRef = useRef<(HTMLDivElement | null)[]>([]);
-  const nextDiscContainerRef = useRef<HTMLDivElement | null>(null);
+  const nextDiscProgressRef = useRef(0);
   const isNavigatingNextRef = useRef(false);
 
   // Scroll to top on slug change
@@ -330,6 +277,10 @@ export default function ProjectView() {
     const isMobile = window.innerWidth < 760;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    // Set initial dark tone on body
+    document.body.classList.remove('tone-light', 'tone-dark');
+    document.body.classList.add('tone-dark');
+
     // Fade white overlay out on mount if coming from transition
     if (whiteOverlayRef.current) {
       gsap.fromTo(
@@ -370,20 +321,21 @@ export default function ProjectView() {
       clipPathRef.current.setAttribute('d', initialClipD);
     }
 
-    // 1. Header Intro Timeline
+    // 1. Header Intro Timeline (BUG FIX: gsap.set(validTitleLines, { yPercent: 100 }))
     const introTL = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    const validTitleLines = titleLinesRef.current.filter(Boolean);
 
     if (prefersReducedMotion) {
-      gsap.set(titleLinesRef.current.filter(Boolean), { yPercent: 0 });
+      gsap.set(validTitleLines, { yPercent: 0 });
       if (creditsRef.current) gsap.set(creditsRef.current, { opacity: 1, y: 0 });
       gsap.set(metaBordersRef.current.filter(Boolean), { scaleX: 1 });
       gsap.set(metaLabelsRef.current.filter(Boolean), { opacity: 1 });
       gsap.set(metaValuesRef.current.filter(Boolean), { opacity: 1 });
       if (boxedLinksRef.current) gsap.set(boxedLinksRef.current, { opacity: 1, y: 0 });
     } else {
-      introTL.fromTo(
-        titleLinesRef.current.filter(Boolean),
-        { yPercent: 100 },
+      gsap.set(validTitleLines, { yPercent: 100 });
+      introTL.to(
+        validTitleLines,
         { yPercent: 0, duration: 0.9, stagger: 0.08 }
       );
 
@@ -456,13 +408,14 @@ export default function ProjectView() {
       }
     }
 
-    // 3. Quote Pin Section: pin for 250vh (180vh mobile), reveal words yPercent 100 -> 0
+    // 3. Quote Pin Section (BUG FIX: gsap.set(quoteWords, { yPercent: 100 }))
     if (quotePinRef.current) {
       const quoteWords = quoteWordInnersRef.current.filter(Boolean);
 
       if (prefersReducedMotion) {
         gsap.set(quoteWords, { yPercent: 0 });
       } else {
+        gsap.set(quoteWords, { yPercent: 100 });
         const pinDistance = isMobile ? '+=180%' : '+=250%';
         const quoteTL = gsap.timeline({
           scrollTrigger: {
@@ -475,9 +428,8 @@ export default function ProjectView() {
         });
 
         quoteWords.forEach((wordEl, idx) => {
-          quoteTL.fromTo(
+          quoteTL.to(
             wordEl,
-            { yPercent: 100 },
             { yPercent: 0, duration: 0.8, ease: 'power2.out' },
             idx * 0.75
           );
@@ -522,6 +474,7 @@ export default function ProjectView() {
           end: '+=200%',
           scrub: 1.0,
           onUpdate: (self) => {
+            nextDiscProgressRef.current = self.progress;
             if (self.progress >= 0.98) {
               handleNavigateToNext();
             }
@@ -529,9 +482,8 @@ export default function ProjectView() {
         },
       });
 
-      // Odd lines slide right to left, even lines slide left to right
       lines.forEach((lineEl, idx) => {
-        const isOdd = idx % 2 === 0; // 0-based: 1st line (odd) -> right to left
+        const isOdd = idx % 2 === 0;
         nextTL.fromTo(
           lineEl,
           { xPercent: isOdd ? 25 : -25 },
@@ -539,17 +491,27 @@ export default function ProjectView() {
           0
         );
       });
-
-      // Next disc rises from bottom edge into center
-      if (nextDiscContainerRef.current) {
-        nextTL.fromTo(
-          nextDiscContainerRef.current,
-          { yPercent: 130 },
-          { yPercent: 0, ease: 'power2.out' },
-          0
-        );
-      }
     }
+
+    // 6. Tone ScrollTriggers per section (tone-light / tone-dark on body)
+    const toneSections = pageRef.current?.querySelectorAll<HTMLElement>('[data-tone]');
+    toneSections?.forEach((sec) => {
+      const tone = sec.getAttribute('data-tone');
+      if (!tone) return;
+      ScrollTrigger.create({
+        trigger: sec,
+        start: 'top 50%',
+        end: 'bottom 50%',
+        onEnter: () => {
+          document.body.classList.remove('tone-light', 'tone-dark');
+          document.body.classList.add(`tone-${tone}`);
+        },
+        onEnterBack: () => {
+          document.body.classList.remove('tone-light', 'tone-dark');
+          document.body.classList.add(`tone-${tone}`);
+        },
+      });
+    });
 
     return () => {
       gsap.ticker.remove(tickerCb);
@@ -559,6 +521,7 @@ export default function ProjectView() {
       document.documentElement.style.height = '';
       document.body.style.overflow = '';
       document.body.style.height = '';
+      document.body.classList.remove('tone-light', 'tone-dark');
       if (pageRef.current) {
         pageRef.current.style.backgroundColor = '';
         pageRef.current.style.color = '';
@@ -599,8 +562,8 @@ export default function ProjectView() {
         />
       )}
 
-      {/* 1. Header Section (First Viewport) */}
-      <header className={styles.header}>
+      {/* 1. Header Section (First Viewport - 100svh) */}
+      <header className={styles.header} data-tone="dark">
         <h1 className={styles.title}>
           {titleLines.map((line, i) => (
             <span key={i} className={styles.titleLineMask}>
@@ -692,7 +655,7 @@ export default function ProjectView() {
         )}
       </header>
 
-      {/* Torn-edge Hero Image Reveal */}
+      {/* Torn-edge Hero Image Reveal (peeking in at 100svh - 12vh) */}
       <section
         ref={heroRevealContainerRef}
         className={styles.heroRevealContainer}
@@ -719,8 +682,8 @@ export default function ProjectView() {
         )}
       </section>
 
-      {/* 2. Pinned Hero Quote Section (pinned full-screen for 250vh / 180vh mobile) */}
-      <section ref={quotePinRef} className={styles.quotePinSection}>
+      {/* 2. Pinned Hero Quote Section (250vh / 180vh mobile) */}
+      <section ref={quotePinRef} className={styles.quotePinSection} data-tone="dark">
         {/* Full-screen hero background */}
         <div className={styles.quoteHeroBg}>
           {!imgError && project.heroImage ? (
@@ -794,7 +757,7 @@ export default function ProjectView() {
       </section>
 
       {/* 3. Summary & Recognition Section (Page background tweens to #d6d3cf) */}
-      <section ref={summaryRef} className={styles.summarySection}>
+      <section ref={summaryRef} className={styles.summarySection} data-tone="light">
         <div className={styles.summaryContainer}>
           <div className={styles.summaryLeft}>
             <p className={styles.summaryParagraph}>{project.summary}</p>
@@ -813,7 +776,11 @@ export default function ProjectView() {
       </section>
 
       {/* 4. Next Project Section (Grey section, about 200vh) */}
-      <section ref={nextSectionRef} className={styles.nextProjectSection}>
+      <section
+        ref={nextSectionRef}
+        className={styles.nextProjectSection}
+        data-tone="light"
+      >
         {/* 5 full-width horizontal lines (1px, #111 at 30% opacity) */}
         <div className={styles.nextGridLines} aria-hidden="true">
           <div className={styles.nextLine} style={{ top: '16%' }} />
@@ -823,7 +790,7 @@ export default function ProjectView() {
           <div className={styles.nextLine} style={{ top: '80%' }} />
         </div>
 
-        {/* Next project title lines (sitting on lines; scrub slides odd right-to-left, even left-to-right) */}
+        {/* Next project title lines (sliding left/right on scrub) */}
         <div className={styles.nextTitlesContainer} onClick={handleNavigateToNext}>
           {nextTitleLines.map((line, i) => {
             const lineTops = ['16%', '32%', '48%', '64%', '80%'];
@@ -843,27 +810,33 @@ export default function ProjectView() {
           })}
         </div>
 
-        {/* The Next Disc: rises from bottom edge as you scroll, with SVG wobble outline */}
-        <div
-          ref={nextDiscContainerRef}
-          className={styles.nextDiscWrapper}
-          onClick={handleNavigateToNext}
-        >
-          <div className={styles.nextDiscItem}>
-            <div
-              className={styles.nextDiscFace}
-              style={{
-                background: `radial-gradient(circle at 28% 24%, hsl(${nextProject.hue} 70% 62%), hsl(${nextProject.hue + 35} 55% 22%) 48%, #0b0b0c 80%)`,
-              }}
-            >
-              <div className={styles.nextDiscTitle}>{nextProject.title}</div>
-            </div>
-            <div className={styles.nextDiscRim} />
-            <div className={styles.nextDiscHole} />
-          </div>
-
-          {/* Procedural Boiling Wobble Outline */}
-          <WobbleOutline radius={140} />
+        {/* 3D Next-project Disc Canvas */}
+        <div className={styles.nextDiscCanvasWrapper}>
+          <Canvas
+            dpr={[1, 2]}
+            camera={{ fov: 35, position: [0, 0, 6] }}
+            gl={{ alpha: true, antialias: true }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'auto',
+            }}
+          >
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[5, 8, 6]} intensity={0.8} />
+            <directionalLight position={[-5, -4, -2]} intensity={0.25} />
+            <Suspense fallback={null}>
+              <Environment preset="studio" />
+            </Suspense>
+            <SingleDisc
+              project={nextProject}
+              progressRef={nextDiscProgressRef}
+              onClick={handleNavigateToNext}
+              outlineColor="#111111"
+            />
+          </Canvas>
         </div>
 
         {/* Portfolio of Karan S Achar mark */}

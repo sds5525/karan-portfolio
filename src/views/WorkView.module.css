@@ -9,7 +9,7 @@
 .captionOverlay {
   position: absolute;
   left: 50%;
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  bottom: 96px;
   transform: translateX(-50%);
   width: min(680px, 92vw);
   display: flex;
@@ -56,7 +56,7 @@
 
 @media (max-width: 760px) {
   .captionOverlay {
-    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    bottom: 96px;
     flex-direction: column;
     gap: 12px;
     align-items: center;

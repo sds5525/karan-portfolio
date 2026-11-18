@@ -15,23 +15,14 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e0e0e;
-    --fg: #eceae6;
-    --mute: #77756f;
-    --line: #eceae6;
-    --glass: rgba(255, 255, 255, 0.08);
-    --glassd: rgba(28, 28, 30, 0.72);
-    --glassl: rgba(255, 255, 255, 0.16);
-  }
-}
-
 :root[data-theme="dark"] {
   --bg: #0e0e0e;
   --fg: #eceae6;
   --mute: #77756f;
   --line: #eceae6;
+  --glass: rgba(255, 255, 255, 0.08);
+  --glassd: rgba(28, 28, 30, 0.72);
+  --glassl: rgba(255, 255, 255, 0.16);
 }
 
 body.home {

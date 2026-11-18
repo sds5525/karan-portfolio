@@ -36,7 +36,14 @@ function SceneContent({
   const [transitionTarget, setTransitionTarget] = useState<number | null>(null);
   const isTransitioningRef = useRef(false);
 
-  useFrame(() => {
+  useFrame((state) => {
+    // Subtle parallax: camera position follows mouse by ±0.08 in x/y (lerp 0.05)
+    const targetCamX = state.pointer.x * 0.08;
+    const targetCamY = state.pointer.y * 0.08;
+    state.camera.position.x += (targetCamX - state.camera.position.x) * 0.05;
+    state.camera.position.y += (targetCamY - state.camera.position.y) * 0.05;
+    state.camera.lookAt(0, 0, 0);
+
     if (transitionTarget !== null) return;
 
     // Lerp pos towards target
@@ -97,10 +104,12 @@ function SceneContent({
           index={i}
           project={project}
           posRef={posRef}
+          targetRef={targetRef}
           movedRef={movedRef}
           fromHome={fromHome}
           introStartRef={introStartRef}
           transitionTarget={transitionTarget}
+          outlineColor="#eceae6"
           onSelect={handleSelect}
         />
       ))}

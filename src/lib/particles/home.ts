@@ -8,7 +8,8 @@ interface Particle {
   vy: number;
   tx: number;
   ty: number;
-  b: number;
+  alpha: number;
+  spot: number;
   dl: number;
   ld?: number;
   la?: number;
@@ -170,18 +171,18 @@ export class HomeParticles {
 
   private updateCloudTargets(elapsed: number, still: boolean): void {
     if (!this.cloud) return;
-    const angle = still ? 0 : elapsed * 0.00012;
-    const cosY = Math.cos(angle);
-    const sinY = Math.sin(angle);
-    const tiltX = (22 * Math.PI) / 180;
-    const cosX = Math.cos(tiltX);
-    const sinX = Math.sin(tiltX);
 
-    const fov = 2.2;
-    const scale = Math.min(this.W * 0.62, this.H * 1.1);
-    const scaleFov = scale * fov;
+    const ang = still ? 0 : elapsed * 0.0001;
+    const cosAng = Math.cos(ang);
+    const sinAng = Math.sin(ang);
+
+    const t = (14 * Math.PI) / 180;
+    const cosT = Math.cos(t);
+    const sinT = Math.sin(t);
+
+    const f = Math.min(this.H * 1.5, this.W * 0.85);
     const cx = this.W / 2;
-    const cy = this.H * 0.55;
+    const cy = this.H * 0.60;
     const pos = this.cloud.pos;
 
     for (let i = 0; i < this.PS.length; i++) {
@@ -189,29 +190,29 @@ export class HomeParticles {
       if (p.pi === undefined) continue;
 
       const idx = p.pi * 3;
-      const x0 = pos[idx];
-      const y0 = pos[idx + 1];
-      const z0 = pos[idx + 2];
+      const x = pos[idx];
+      const y = pos[idx + 1];
+      const z = pos[idx + 2];
 
-      // Rotate around Y by angle
-      const x1 = x0 * cosY + z0 * sinY;
-      const y1 = y0;
-      const z1 = -x0 * sinY + z0 * cosY;
+      // Rotate around Y by ang
+      const x1 = x * cosAng + z * sinAng;
+      const z1 = -x * sinAng + z * cosAng;
+      const y1 = y - 0.55;
 
-      // Rotate around X by 22° tilt
-      const x2 = x1;
-      const y2 = y1 * cosX - z1 * sinX;
-      const z2 = y1 * sinX + z1 * cosX;
+      // Tilt 14° around X
+      const y2 = y1 * cosT - z1 * sinT;
+      const z2 = y1 * sinT + z1 * cosT;
 
-      // Project
-      const zp = z2 + fov;
-      const invZ = 1 / zp;
-      p.tx = cx + x2 * scaleFov * invZ;
-      p.ty = cy - y2 * scaleFov * invZ;
+      const zp = z2 + 5.6;
+      if (zp < 0.3) {
+        p.alpha = 0;
+      } else {
+        p.tx = cx + (x1 * f) / zp;
+        p.ty = cy - (y2 * f) / zp;
 
-      // Depth: 0 at back to 1 at front (closer to camera has smaller z2)
-      const depth = Math.max(0, Math.min(1, 0.5 - z2));
-      p.b = 0.25 + 0.75 * depth;
+        const depthFactor = Math.max(0.3, Math.min(1, 3.6 / zp));
+        p.alpha = Math.max(0, Math.min(1, p.spot * depthFactor));
+      }
 
       if (still) {
         p.x = p.tx;
@@ -225,8 +226,14 @@ export class HomeParticles {
 
     if (this.cloud) {
       const count = this.cloud.count;
+      const pos = this.cloud.pos;
       this.PS.forEach((p) => {
         p.pi = Math.floor(Math.random() * count);
+        const idx = p.pi * 3;
+        const x = pos[idx];
+        const z = pos[idx + 2];
+        const r = Math.hypot(x, z);
+        p.spot = 0.6 + 0.4 * Math.exp(-Math.pow(r / 0.6, 2));
       });
       this.updateCloudTargets(0, still);
       return;
@@ -240,7 +247,8 @@ export class HomeParticles {
       const k = ((Math.random() * m) | 0) * 3;
       p.tx = c[k] + Math.random() * 2;
       p.ty = c[k + 1] + Math.random() * 2;
-      p.b = 0.25 + c[k + 2] * 0.75;
+      p.spot = 1;
+      p.alpha = 0.25 + c[k + 2] * 0.75;
       if (still) {
         p.x = p.tx;
         p.y = p.ty;
@@ -278,7 +286,7 @@ export class HomeParticles {
   private initP(): void {
     this.size();
     this.PS = [];
-    const n = window.innerWidth < 700 ? 9000 : 24000;
+    const n = window.innerWidth < 700 ? 14000 : 36000;
     const lg = this.intro;
     if (lg) this.makeLogo();
     const m = this.logoPts.length / 2;
@@ -293,7 +301,8 @@ export class HomeParticles {
         vy: Math.sin(a) * v,
         tx: this.W / 2,
         ty: this.H / 2,
-        b: 0.5,
+        alpha: 1,
+        spot: 1,
         dl: Math.random() * (lg ? 250 : 1000),
       });
     }
@@ -360,9 +369,10 @@ export class HomeParticles {
       this.updateCloudTargets(t, still);
     }
 
-    const g2 = this.ctx;
-    g2.clearRect(0, 0, this.W, this.H);
-    g2.fillStyle = '#fff';
+    // After the intro burst has settled (1.6 s after the burst), switch spring to k=0.08, damping=0.80
+    const settled = (!this.intro && !this.burst) || (this.burst && t >= 1600);
+    const k = settled ? 0.08 : 0.012;
+    const damping = settled ? 0.80 : 0.93;
 
     const nl = performance.now() - this.tL;
     for (const p of this.PS) {
@@ -372,8 +382,8 @@ export class HomeParticles {
         p.x += p.vx;
         p.y += p.vy;
       } else if (t > p.dl) {
-        p.vx = (p.vx + (p.tx - p.x) * 0.012) * 0.93;
-        p.vy = (p.vy + (p.ty - p.y) * 0.012) * 0.93;
+        p.vx = (p.vx + (p.tx - p.x) * k) * damping;
+        p.vy = (p.vy + (p.ty - p.y) * k) * damping;
         const dx = p.x - this.mx;
         const dy = p.y - this.my;
         const d2 = dx * dx + dy * dy;
@@ -388,22 +398,29 @@ export class HomeParticles {
       }
     }
 
+    const g2 = this.ctx;
+    g2.clearRect(0, 0, this.W, this.H);
+
+    // Soft glow: draw the GL sprite (12px, alpha 0.05, 'lighter') for only every 8th particle
     g2.globalCompositeOperation = 'lighter';
-    g2.globalAlpha = 0.16;
-    const step = this.leaving ? 3 : 1;
-    for (let i = 0; i < this.PS.length; i += step) {
+    g2.globalAlpha = 0.05;
+    for (let i = 0; i < this.PS.length; i += 8) {
       const p = this.PS[i];
-      if (p.y > -12) g2.drawImage(GL, p.x - 8, p.y - 8, 16, 16);
+      if (p.alpha > 0 && p.y > -12) {
+        g2.drawImage(GL, p.x - 6, p.y - 6, 12, 12);
+      }
     }
 
-    g2.fillStyle = '#fff';
-    for (const p of this.PS) {
-      if (p.y < -12) continue;
-      g2.globalAlpha = 0.45 + p.b * 0.55;
-      g2.fillRect(p.x - 0.2, p.y - 0.2, 1.7, 1.7);
-    }
-
+    // Crisp particles: 1.4px white square at its alpha
     g2.globalCompositeOperation = 'source-over';
+    g2.fillStyle = '#fff';
+    for (let i = 0; i < this.PS.length; i++) {
+      const p = this.PS[i];
+      if (p.alpha <= 0 || p.y < -12) continue;
+      g2.globalAlpha = p.alpha;
+      g2.fillRect(p.x - 0.7, p.y - 0.7, 1.4, 1.4);
+    }
+
     g2.globalAlpha = 1;
 
     if (this.leaving && (nl > 2800 || (nl > 900 && this.PS.every((p) => p.y < -14)))) {
