@@ -1,5 +1,4 @@
 import logoSrc from '../../assets/masala-logo.png';
-import { loadCloud, type PointCloud } from './cloud';
 
 interface Particle {
   x: number;
@@ -13,7 +12,6 @@ interface Particle {
   dl: number;
   ld?: number;
   la?: number;
-  pi?: number;
 }
 
 const SESSION_KEY = 'portfolio_home_intro_played';
@@ -41,7 +39,7 @@ export const markHomeIntroPlayed = (): void => {
 const LOGOIMG = new Image();
 LOGOIMG.src = logoSrc;
 
-const HOLD = 2200;
+export const HOLD = 2200;
 
 const createGL = (): HTMLCanvasElement => {
   const c = document.createElement('canvas');
@@ -62,6 +60,7 @@ export class HomeParticles {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private onLeaveComplete?: () => void;
+  private onLogoBurst?: () => boolean;
 
   private W = 0;
   private H = 0;
@@ -80,29 +79,21 @@ export class HomeParticles {
   private leaving = false;
   private tL = 0;
   private rafId = 0;
-  private cloud: PointCloud | null = null;
 
-  constructor(canvas: HTMLCanvasElement, onLeaveComplete?: () => void) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    onLeaveComplete?: () => void,
+    onLogoBurst?: () => boolean
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.onLeaveComplete = onLeaveComplete;
+    this.onLogoBurst = onLogoBurst;
 
     const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
     if (still || hasPlayedHomeIntro()) {
       this.intro = false;
     }
-
-    // Start loading the point cloud; does not block the intro hold
-    loadCloud()
-      .then((cloud) => {
-        this.cloud = cloud;
-        if (this.PS.length > 0) {
-          this.retarget();
-        }
-      })
-      .catch((err) => {
-        console.warn('Point cloud load failed, falling back to silhouette:', err);
-      });
   }
 
   public isIntroActive(): boolean {
@@ -122,6 +113,7 @@ export class HomeParticles {
     this.ctx.setTransform(r, 0, 0, r, 0, 0);
   }
 
+  // Fallback 2D procedural silhouette
   private silhouette(): number[] {
     const o = document.createElement('canvas');
     o.width = this.W;
@@ -169,77 +161,8 @@ export class HomeParticles {
     return c;
   }
 
-  private updateCloudTargets(elapsed: number, still: boolean): void {
-    if (!this.cloud) return;
-
-    const ang = still ? 0 : elapsed * 0.0001;
-    const cosAng = Math.cos(ang);
-    const sinAng = Math.sin(ang);
-
-    const t = (14 * Math.PI) / 180;
-    const cosT = Math.cos(t);
-    const sinT = Math.sin(t);
-
-    const f = Math.min(this.H * 1.5, this.W * 0.85);
-    const cx = this.W / 2;
-    const cy = this.H * 0.60;
-    const pos = this.cloud.pos;
-
-    for (let i = 0; i < this.PS.length; i++) {
-      const p = this.PS[i];
-      if (p.pi === undefined) continue;
-
-      const idx = p.pi * 3;
-      const x = pos[idx];
-      const y = pos[idx + 1];
-      const z = pos[idx + 2];
-
-      // Rotate around Y by ang
-      const x1 = x * cosAng + z * sinAng;
-      const z1 = -x * sinAng + z * cosAng;
-      const y1 = y - 0.55;
-
-      // Tilt 14° around X
-      const y2 = y1 * cosT - z1 * sinT;
-      const z2 = y1 * sinT + z1 * cosT;
-
-      const zp = z2 + 5.6;
-      if (zp < 0.3) {
-        p.alpha = 0;
-      } else {
-        p.tx = cx + (x1 * f) / zp;
-        p.ty = cy - (y2 * f) / zp;
-
-        const depthFactor = Math.max(0.3, Math.min(1, 3.6 / zp));
-        p.alpha = Math.max(0, Math.min(1, p.spot * depthFactor));
-      }
-
-      if (still) {
-        p.x = p.tx;
-        p.y = p.ty;
-      }
-    }
-  }
-
   private retarget(): void {
     const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
-
-    if (this.cloud) {
-      const count = this.cloud.count;
-      const pos = this.cloud.pos;
-      this.PS.forEach((p) => {
-        p.pi = Math.floor(Math.random() * count);
-        const idx = p.pi * 3;
-        const x = pos[idx];
-        const z = pos[idx + 2];
-        const r = Math.hypot(x, z);
-        p.spot = 0.6 + 0.4 * Math.exp(-Math.pow(r / 0.6, 2));
-      });
-      this.updateCloudTargets(0, still);
-      return;
-    }
-
-    // Fallback: procedural silhouette
     const c = this.silhouette();
     const m = c.length / 3;
     if (!m) return;
@@ -286,7 +209,7 @@ export class HomeParticles {
   private initP(): void {
     this.size();
     this.PS = [];
-    const n = window.innerWidth < 700 ? 14000 : 36000;
+    const n = window.innerWidth < 700 ? 10000 : 20000;
     const lg = this.intro;
     if (lg) this.makeLogo();
     const m = this.logoPts.length / 2;
@@ -352,6 +275,14 @@ export class HomeParticles {
       this.burst = true;
       this.intro = false;
       markHomeIntroPlayed();
+
+      // Check if Three.js point scene is ready to take over
+      if (this.onLogoBurst && this.onLogoBurst()) {
+        this.stop();
+        return;
+      }
+
+      // Procedural 2D fallback burst
       this.PS.forEach((p) => {
         const a = Math.atan2(p.y - this.H / 2, p.x - this.W / 2) + (Math.random() - 0.5) * 1.4;
         const v = 6 + Math.random() * 20;
@@ -362,14 +293,7 @@ export class HomeParticles {
       t = 0;
     }
 
-    const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
-
-    // Every frame before physics: rotate 3D point cloud & project to moving targets
-    if (this.cloud) {
-      this.updateCloudTargets(t, still);
-    }
-
-    // After the intro burst has settled (1.6 s after the burst), switch spring to k=0.08, damping=0.80
+    // Spring physics for fallback 2D mode
     const settled = (!this.intro && !this.burst) || (this.burst && t >= 1600);
     const k = settled ? 0.08 : 0.012;
     const damping = settled ? 0.80 : 0.93;
@@ -401,7 +325,6 @@ export class HomeParticles {
     const g2 = this.ctx;
     g2.clearRect(0, 0, this.W, this.H);
 
-    // Soft glow: draw the GL sprite (12px, alpha 0.05, 'lighter') for only every 8th particle
     g2.globalCompositeOperation = 'lighter';
     g2.globalAlpha = 0.05;
     for (let i = 0; i < this.PS.length; i += 8) {
@@ -411,7 +334,6 @@ export class HomeParticles {
       }
     }
 
-    // Crisp particles: 1.4px white square at its alpha
     g2.globalCompositeOperation = 'source-over';
     g2.fillStyle = '#fff';
     for (let i = 0; i < this.PS.length; i++) {

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import {
@@ -36,8 +36,12 @@ function randomParams(hasRotation: boolean): WobbleParams {
   };
 }
 
-function computeStrokePoints(rBase: number, params: WobbleParams): [number, number, number][] {
-  const pts: [number, number, number][] = [];
+const PLACEHOLDER_POINTS: [number, number, number][] = Array.from(
+  { length: 140 },
+  (_, i) => [Math.cos((i / 139) * Math.PI * 2), Math.sin((i / 139) * Math.PI * 2), 0]
+);
+
+function fillStrokePositions(rBase: number, params: WobbleParams, out: Float32Array): void {
   const count = 140;
   const totalAngle = 1.08 * Math.PI * 2;
   const { p1, p2, cx, cy, rot } = params;
@@ -48,21 +52,24 @@ function computeStrokePoints(rBase: number, params: WobbleParams): [number, numb
     const r = rBase * (1 + noise);
     const x = cx + r * Math.cos(theta);
     const y = cy + r * Math.sin(theta);
-    pts.push([x, y, 0.003]);
+    const idx = j * 3;
+    out[idx] = x;
+    out[idx + 1] = y;
+    out[idx + 2] = 0.003;
   }
-  return pts;
+}
+
+interface SingleDiscWobbleOutlineProps {
+  activeRef: (() => boolean) | React.MutableRefObject<boolean>;
+  outlineColor?: string;
 }
 
 function SingleDiscWobbleOutline({
-  active,
+  activeRef,
   outlineColor = '#111111',
-}: {
-  active: boolean;
-  outlineColor?: string;
-}) {
-  const [pts1, setPts1] = useState<[number, number, number][]>([]);
-  const [pts2, setPts2] = useState<[number, number, number][]>([]);
-  const [opacity, setOpacity] = useState(0);
+}: SingleDiscWobbleOutlineProps) {
+  const line1Ref = useRef<any>(null);
+  const line2Ref = useRef<any>(null);
 
   const stateRef = useRef<'idle' | 'drawing' | 'boiling' | 'fading'>('idle');
   const hoverStartTimeRef = useRef(0);
@@ -70,11 +77,21 @@ function SingleDiscWobbleOutline({
   const lastBoilTimeRef = useRef(0);
   const params1Ref = useRef<WobbleParams>(randomParams(false));
   const params2Ref = useRef<WobbleParams>(randomParams(true));
-  const fullPts1Ref = useRef<[number, number, number][]>([]);
-  const fullPts2Ref = useRef<[number, number, number][]>([]);
+  const flatPts1Ref = useRef<Float32Array>(new Float32Array(140 * 3));
+  const flatPts2Ref = useRef<Float32Array>(new Float32Array(140 * 3));
 
   useFrame(() => {
+    if (
+      !line1Ref.current ||
+      !line2Ref.current ||
+      !line1Ref.current.geometry ||
+      !line2Ref.current.geometry
+    ) {
+      return;
+    }
+
     const now = performance.now();
+    const active = typeof activeRef === 'function' ? activeRef() : activeRef.current;
 
     if (active) {
       if (stateRef.current === 'idle' || stateRef.current === 'fading') {
@@ -83,8 +100,10 @@ function SingleDiscWobbleOutline({
         lastBoilTimeRef.current = now;
         params1Ref.current = randomParams(false);
         params2Ref.current = randomParams(true);
-        fullPts1Ref.current = computeStrokePoints(1.06, params1Ref.current);
-        fullPts2Ref.current = computeStrokePoints(1.12, params2Ref.current);
+        fillStrokePositions(1.06, params1Ref.current, flatPts1Ref.current);
+        fillStrokePositions(1.12, params2Ref.current, flatPts2Ref.current);
+        line1Ref.current.geometry.setPositions(flatPts1Ref.current);
+        line2Ref.current.geometry.setPositions(flatPts2Ref.current);
       }
 
       // Boiling every 110 ms
@@ -92,24 +111,33 @@ function SingleDiscWobbleOutline({
         lastBoilTimeRef.current = now;
         params1Ref.current = randomParams(false);
         params2Ref.current = randomParams(true);
-        fullPts1Ref.current = computeStrokePoints(1.06, params1Ref.current);
-        fullPts2Ref.current = computeStrokePoints(1.12, params2Ref.current);
+        fillStrokePositions(1.06, params1Ref.current, flatPts1Ref.current);
+        fillStrokePositions(1.12, params2Ref.current, flatPts2Ref.current);
+        line1Ref.current.geometry.setPositions(flatPts1Ref.current);
+        line2Ref.current.geometry.setPositions(flatPts2Ref.current);
       }
 
       const elapsed = now - hoverStartTimeRef.current;
       const progress1 = Math.min(1, Math.max(0, elapsed / 300));
       const progress2 = Math.min(1, Math.max(0, (elapsed - 70) / 300));
 
-      const count1 = Math.max(2, Math.floor(progress1 * 140));
-      const count2 = Math.max(2, Math.floor(progress2 * 140));
+      const visibleSegments1 = Math.floor(progress1 * 139);
+      const visibleSegments2 = Math.floor(progress2 * 139);
 
-      setPts1(fullPts1Ref.current.slice(0, count1));
-      if (progress2 > 0) {
-        setPts2(fullPts2Ref.current.slice(0, count2));
-      } else {
-        setPts2([]);
+      line1Ref.current.geometry.instanceCount = visibleSegments1;
+      line2Ref.current.geometry.instanceCount = visibleSegments2;
+
+      line1Ref.current.visible = visibleSegments1 > 0;
+      line2Ref.current.visible = visibleSegments2 > 0;
+
+      const mat1 = line1Ref.current.material;
+      const mat2 = line2Ref.current.material;
+      if (mat1) mat1.opacity = 0.9;
+      if (mat2) mat2.opacity = 0.9;
+
+      if (elapsed >= 370) {
+        stateRef.current = 'boiling';
       }
-      setOpacity(0.9);
     } else {
       if (stateRef.current === 'drawing' || stateRef.current === 'boiling') {
         stateRef.current = 'fading';
@@ -120,38 +148,44 @@ function SingleDiscWobbleOutline({
         const elapsedOut = now - hoverOutTimeRef.current;
         if (elapsedOut >= 180) {
           stateRef.current = 'idle';
-          setPts1([]);
-          setPts2([]);
-          setOpacity(0);
+          line1Ref.current.visible = false;
+          line2Ref.current.visible = false;
+          line1Ref.current.geometry.instanceCount = 0;
+          line2Ref.current.geometry.instanceCount = 0;
         } else {
-          setOpacity(0.9 * (1 - elapsedOut / 180));
+          const op = 0.9 * (1 - elapsedOut / 180);
+          const mat1 = line1Ref.current.material;
+          const mat2 = line2Ref.current.material;
+          if (mat1) mat1.opacity = op;
+          if (mat2) mat2.opacity = op;
         }
+      } else if (stateRef.current === 'idle') {
+        line1Ref.current.visible = false;
+        line2Ref.current.visible = false;
       }
     }
   });
 
-  if (opacity <= 0.001) return null;
-
   return (
     <group position={[0, 0, 0.003]}>
-      {pts1.length >= 2 && (
-        <Line
-          points={pts1}
-          color={outlineColor}
-          lineWidth={2.4}
-          transparent
-          opacity={opacity}
-        />
-      )}
-      {pts2.length >= 2 && (
-        <Line
-          points={pts2}
-          color={outlineColor}
-          lineWidth={2.4}
-          transparent
-          opacity={opacity}
-        />
-      )}
+      <Line
+        ref={line1Ref}
+        points={PLACEHOLDER_POINTS}
+        color={outlineColor}
+        lineWidth={2.4}
+        transparent
+        opacity={0}
+        visible={false}
+      />
+      <Line
+        ref={line2Ref}
+        points={PLACEHOLDER_POINTS}
+        color={outlineColor}
+        lineWidth={2.4}
+        transparent
+        opacity={0}
+        visible={false}
+      />
     </group>
   );
 }
@@ -342,7 +376,7 @@ export function SingleDisc({
 
         {/* 2-stroke boiling wobble outline with drei <Line> */}
         <SingleDiscWobbleOutline
-          active={isHoveredRef.current}
+          activeRef={() => isHoveredRef.current}
           outlineColor={outlineColor}
         />
       </group>
