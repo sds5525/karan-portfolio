@@ -88,7 +88,10 @@ export default function Layout() {
 
   return (
     <>
-      <Link to="/" className={styles.brand}>
+      <Link
+        to="/"
+        className={`${styles.brand} ${isHome ? styles.brandHome : ''}`}
+      >
         MSLOTW
       </Link>
 
@@ -100,12 +103,16 @@ export default function Layout() {
           </div>
         ) : (
           <>
-            <Link to="/" className={styles.navBrand}>
-              MSLOTW
-            </Link>
-            <span className={styles.navDot} aria-hidden="true">
-              ·
-            </span>
+            {!isHome && (
+              <>
+                <Link to="/" className={styles.navBrand}>
+                  MSLOTW
+                </Link>
+                <span className={styles.navDot} aria-hidden="true">
+                  ·
+                </span>
+              </>
+            )}
             <NavLink
               to="/work"
               end

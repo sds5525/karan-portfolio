@@ -13,6 +13,7 @@ interface PointSceneProps {
 
 const vertexShader = /* glsl */ `
   uniform float uDpr;
+  uniform float uAlphaMul;
   uniform float uIntro;
   uniform float uLeave;
   uniform vec2 uMouse;
@@ -61,11 +62,11 @@ const vertexShader = /* glsl */ `
     vec4 mvPosition = modelViewMatrix * vec4(curPos, 1.0);
     float distZ = max(0.001, -mvPosition.z);
 
-    // Point size: clamp(2.2 * uDpr / -mvPosition.z, 1.0, 2.6)
-    gl_PointSize = clamp(2.2 * uDpr / distZ, 1.0, 2.6);
+    // Point size in CSS pixels (so high-DPI phones don't shrink the dots)
+    gl_PointSize = clamp(2.2 * uDpr / distZ, 1.0 * uDpr, 2.6 * uDpr);
 
-    // Colour alpha: clamp(1.6 / -mvPosition.z, 0.25, 1.0) * 0.55
-    float baseAlpha = clamp(1.6 / distZ, 0.25, 1.0) * 0.55;
+    // Colour alpha: clamp(1.6 / dist, 0.25, 1.0) * uAlphaMul
+    float baseAlpha = clamp(1.6 / distZ, 0.25, 1.0) * uAlphaMul;
     float leaveFade = clamp(1.0 - tLeave * 2.0, 0.0, 1.0) * clamp(1.0 - uLeave, 0.0, 1.0);
     vAlpha = baseAlpha * leaveFade;
 
@@ -135,6 +136,7 @@ function PointsContent({
   const uniforms = useMemo(
     () => ({
       uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) },
+      uAlphaMul: { value: size.width < 760 ? 0.8 : 0.55 },
       uIntro: { value: playBurst ? 0.0 : 1.0 },
       uLeave: { value: 0.0 },
       uMouse: { value: new THREE.Vector2(-999, -999) },
@@ -177,12 +179,19 @@ function PointsContent({
     const elapsed = performance.now() - startTimeRef.current;
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Orbit: Position = (sin(ang) * 4.6, 0.75, cos(ang) * 4.6), lookAt (0, 0.45, 0)
+    // Portrait screens (width / height < 1): orbit radius 7.6 (desktop 4.6), height 1.15 (desktop 0.75), lookAt (0, 0.5, 0)
+    const isPortrait = state.size.width / state.size.height < 1.0;
+    const isMobile = state.size.width < 760;
+
+    const orbitRadius = isPortrait ? 7.6 : 4.6;
+    const orbitHeight = isPortrait ? 1.15 : 0.75;
+    const lookAtY = isPortrait ? 0.5 : 0.45;
+
     // ang = 0.4 + elapsed * 0.00004 rad/ms (fixed at 0.4 for reduced motion)
     const ang = still ? 0.4 : 0.4 + elapsed * 0.00004;
-    const baseX = Math.sin(ang) * 4.6;
-    const baseY = 0.75;
-    const baseZ = Math.cos(ang) * 4.6;
+    const baseX = Math.sin(ang) * orbitRadius;
+    const baseY = orbitHeight;
+    const baseZ = Math.cos(ang) * orbitRadius;
 
     // Mouse parallax: offset camera ±0.25 in x and ±0.12 in y towards pointer (lerp 0.04)
     const targetCamX = state.pointer.x * 0.25;
@@ -195,7 +204,7 @@ function PointsContent({
       baseY + parallaxRef.current.y,
       baseZ
     );
-    state.camera.lookAt(0, 0.45, 0);
+    state.camera.lookAt(0, lookAtY, 0);
 
     // Smooth uMouse in JS (lerp 0.15) so it feels liquid
     const targetX = pointerPosRef?.current?.x ?? state.pointer.x;
@@ -216,6 +225,7 @@ function PointsContent({
       );
       materialRef.current.uniforms.uAspect.value = state.size.width / state.size.height;
       materialRef.current.uniforms.uDpr.value = Math.min(window.devicePixelRatio || 1, 2);
+      materialRef.current.uniforms.uAlphaMul.value = isMobile ? 0.8 : 0.55;
     }
   });
 

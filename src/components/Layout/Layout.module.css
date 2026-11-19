@@ -223,6 +223,10 @@
     display: none;
   }
 
+  .brandHome {
+    display: block;
+  }
+
   .nav {
     padding: 4px 6px;
     gap: 2px;

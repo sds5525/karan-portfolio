@@ -238,6 +238,7 @@ export function Disc3D({
   const settleTimeRef = useRef(0);
   const touchStartTimeRef = useRef(0);
   const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const touchMovedFarRef = useRef(false);
   const lastTapTimeRef = useRef(0);
 
   // Soft lerping position, scale, and rotation refs
@@ -433,28 +434,39 @@ export function Disc3D({
       }
     }
 
-    const isHovered = isHoveredRef.current && a < 0.45 && !movedRef.current;
-    const lerpRate = isHovered ? 0.15 : 0.08;
+    const isTouchActive = isPressedRef.current && a < 0.45 && !movedRef.current && !touchMovedFarRef.current;
+    const isHoverActive = isHoveredRef.current && a < 0.45 && !movedRef.current;
+    const isActive = isHoverActive || isTouchActive;
+    const lerpRate = isActive ? 0.15 : 0.08;
 
-    hoverFactor.current += ((isHovered ? 1 : 0) - hoverFactor.current) * lerpRate;
+    hoverFactor.current += ((isActive ? 1 : 0) - hoverFactor.current) * lerpRate;
     curTiltX.current += (targetTiltX.current - curTiltX.current) * lerpRate;
     curTiltY.current += (targetTiltY.current - curTiltY.current) * lerpRate;
 
-    // Final position: bring forward z += 0.2R and scale × 1.04 when hovered (desktop)
+    // Final position: bring forward z += 0.2R and scale × 1.04 when hovered/pressed
     const finalX = curX.current;
     const finalY = curY.current;
-    const finalZ = curZ.current + (isMobile ? 0 : 0.2 * (R ?? 1) * hoverFactor.current);
-    const finalScale = curScale.current * (isMobile ? 1 : 1 + 0.04 * hoverFactor.current);
-    const finalRotX = curRotX.current + (isMobile ? 0 : curTiltX.current * hoverFactor.current);
-    const finalRotY = curRotY.current + (isMobile ? 0 : curTiltY.current * hoverFactor.current);
+    const finalZ = curZ.current + 0.2 * R * hoverFactor.current;
+    const finalScale = curScale.current * (1 + 0.04 * hoverFactor.current);
+    let finalRotX = curRotX.current + curTiltX.current * hoverFactor.current;
+    let finalRotY = curRotY.current + curTiltY.current * hoverFactor.current;
     const finalRotZ = curRotZ.current;
+
+    // Idle sway on touch devices only: centre disc gently rocks
+    const isTouchDevice = isCoarse || isMobile;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (isTouchDevice && !still && a < 0.45) {
+      const t = performance.now() * 0.001;
+      const swayFactor = Math.max(0, 1 - a * 2.2);
+      finalRotX += Math.sin(t * 0.8) * 0.05 * swayFactor;
+      finalRotY += Math.cos(t * 0.6) * 0.05 * swayFactor;
+    }
 
     groupRef.current.position.set(finalX, finalY, finalZ);
     groupRef.current.scale.set(finalScale, finalScale, finalScale);
     groupRef.current.rotation.set(finalRotX, finalRotY, finalRotZ);
 
     if (artworkRef.current) {
-      const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
       if (!still) {
         artworkRef.current.rotation.z += 0.08 * delta;
       }
@@ -478,15 +490,26 @@ export function Disc3D({
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
-    if (window.matchMedia('(pointer: coarse)').matches) {
-      isPressedRef.current = true;
-    }
+    isPressedRef.current = true;
     touchStartTimeRef.current = performance.now();
     touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+    touchMovedFarRef.current = false;
+
+    const d = index - posRef.current;
+    const a = Math.abs(d);
+    if (a < 0.45 && groupRef.current) {
+      const local = groupRef.current.worldToLocal(e.point.clone());
+      targetTiltX.current = -local.y * 0.22;
+      targetTiltY.current = local.x * 0.22;
+    }
   };
 
   const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
+    const wasPressed = isPressedRef.current;
     isPressedRef.current = false;
+    targetTiltX.current = 0;
+    targetTiltY.current = 0;
+
     if (!groupRef.current?.visible) return;
     if (movedRef.current || transitionTarget !== null) return;
     const elapsed = performance.now() - touchStartTimeRef.current;
@@ -494,7 +517,12 @@ export function Disc3D({
       e.clientX - touchStartPosRef.current.x,
       e.clientY - touchStartPosRef.current.y
     );
-    if (elapsed < 500 && dist < 12 && window.matchMedia('(pointer: coarse)').matches) {
+    if (
+      wasPressed &&
+      elapsed < 500 &&
+      dist <= 6 &&
+      window.matchMedia('(pointer: coarse)').matches
+    ) {
       e.stopPropagation();
       triggerTap();
     }
@@ -502,12 +530,31 @@ export function Disc3D({
 
   const handlePointerCancel = () => {
     isPressedRef.current = false;
+    targetTiltX.current = 0;
+    targetTiltY.current = 0;
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
     const d = index - posRef.current;
     const a = Math.abs(d);
+
+    if (isPressedRef.current) {
+      const dist = Math.hypot(
+        e.clientX - touchStartPosRef.current.x,
+        e.clientY - touchStartPosRef.current.y
+      );
+      if (dist > 6) {
+        touchMovedFarRef.current = true;
+        targetTiltX.current = 0;
+        targetTiltY.current = 0;
+      } else if (a < 0.45 && groupRef.current) {
+        const local = groupRef.current.worldToLocal(e.point.clone());
+        targetTiltX.current = -local.y * 0.22;
+        targetTiltY.current = local.x * 0.22;
+      }
+    }
+
     if (a >= 0.45 || movedRef.current || transitionTarget !== null) {
       if (isHoveredRef.current) {
         handlePointerOut();
@@ -516,7 +563,7 @@ export function Disc3D({
     }
     e.stopPropagation();
 
-    if (groupRef.current) {
+    if (groupRef.current && !isPressedRef.current) {
       const local = groupRef.current.worldToLocal(e.point.clone());
       targetTiltX.current = -local.y * 0.22;
       targetTiltY.current = local.x * 0.22;
