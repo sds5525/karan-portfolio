@@ -130,26 +130,50 @@
 }
 
 .idxItem {
-  padding: 4px 0;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  white-space: nowrap;
+  margin: 0 -10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  list-style: none;
 }
 
 .idxItem a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
   color: inherit;
   text-decoration: none;
+  gap: 16px;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.idxItem a:hover {
-  text-decoration: underline;
-}
-
-.idxItem span {
+.idxItem a span:last-child {
   color: var(--mute);
   font-family: var(--mono);
   font-size: 12px;
+  transition: color 0.15s ease;
+}
+
+.idxItem:hover,
+.idxItem.idxItemActive {
+  background: #eceae6;
+  color: #0e0e0e;
+}
+
+.idxItem:hover a,
+.idxItem.idxItemActive a {
+  color: #0e0e0e;
+  text-decoration: none;
+}
+
+.idxItem:hover span,
+.idxItem.idxItemActive span {
+  color: #0e0e0e !important;
+  text-decoration: none;
 }
 
 .ctr {

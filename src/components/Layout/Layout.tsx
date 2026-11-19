@@ -47,6 +47,7 @@ export default function Layout() {
   const currentProjectIndex = projectSlugMatch
     ? projects.findIndex((p) => p.slug === projectSlugMatch[1])
     : -1;
+  const activeWorkIndex = isWork ? parseInt(counterText.split('/')[0].trim(), 10) - 1 : -1;
 
   // Toggle "home" class on <body>
   useEffect(() => {
@@ -129,17 +130,25 @@ export default function Layout() {
                 Index ▾
               </button>
               <ul className={styles.idxList}>
-                {projects.map((project) => (
-                  <li key={project.slug} className={styles.idxItem}>
-                    <Link
-                      to={`/work/${project.slug}`}
-                      onClick={() => setIsIndexOpen(false)}
+                {projects.map((project, i) => {
+                  const isCurrent = isWork
+                    ? i === activeWorkIndex
+                    : (projectSlugMatch ? project.slug === projectSlugMatch[1] : false);
+                  return (
+                    <li
+                      key={project.slug}
+                      className={`${styles.idxItem} ${isCurrent ? styles.idxItemActive : ''}`}
                     >
-                      {project.title}
-                    </Link>
-                    <span>{project.year}</span>
-                  </li>
-                ))}
+                      <Link
+                        to={`/work/${project.slug}`}
+                        onClick={() => setIsIndexOpen(false)}
+                      >
+                        <span>{project.title}</span>
+                        <span>{project.year}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </>

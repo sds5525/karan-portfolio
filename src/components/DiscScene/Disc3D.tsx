@@ -181,8 +181,6 @@ function DiscWobbleOutline({
         color={outlineColor}
         lineWidth={2.4}
         transparent
-        opacity={0}
-        visible={false}
       />
       <Line
         ref={line2Ref}
@@ -190,8 +188,6 @@ function DiscWobbleOutline({
         color={outlineColor}
         lineWidth={2.4}
         transparent
-        opacity={0}
-        visible={false}
       />
     </group>
   );
@@ -313,11 +309,8 @@ export function Disc3D({
     const d = index - pos;
     const a = Math.abs(d);
 
-    if (a > 3.8) {
-      groupRef.current.visible = false;
-      return;
-    }
-    groupRef.current.visible = true;
+    const isHidden = a > 3.5;
+    groupRef.current.visible = !isHidden;
 
     const isMobile = window.innerWidth < 760;
     const R = isMobile ? viewport.width * 0.3 : Math.min(1.15, viewport.width * 0.16);
@@ -333,6 +326,23 @@ export function Disc3D({
     const targetRotX = -0.55;
     const targetRotY = -0.25 - d * 0.16;
     const targetRotZ = 0.35;
+
+    if (isHidden) {
+      curX.current = targetX;
+      curY.current = targetY;
+      curZ.current = targetZ;
+      curScale.current = targetScale;
+      curRotX.current = targetRotX;
+      curRotY.current = targetRotY;
+      curRotZ.current = targetRotZ;
+      groupRef.current.position.set(targetX, targetY, targetZ);
+      groupRef.current.scale.set(targetScale, targetScale, targetScale);
+      groupRef.current.rotation.set(targetRotX, targetRotY, targetRotZ);
+      if (isHoveredRef.current) {
+        isHoveredRef.current = false;
+      }
+      return;
+    }
 
     // Intro rise when coming from home
     if (fromHome && introStartRef.current > 0) {
@@ -406,6 +416,7 @@ export function Disc3D({
   });
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (!groupRef.current?.visible) return;
     const d = index - posRef.current;
     const a = Math.abs(d);
     if (a >= 0.45 || movedRef.current || transitionTarget !== null) {
@@ -429,6 +440,7 @@ export function Disc3D({
   };
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
+    if (!groupRef.current?.visible) return;
     document.body.style.cursor = 'pointer';
     handlePointerMove(e);
   };
@@ -441,6 +453,7 @@ export function Disc3D({
   };
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!groupRef.current?.visible) return;
     e.stopPropagation();
     if (movedRef.current || transitionTarget !== null) return;
     const d = index - posRef.current;

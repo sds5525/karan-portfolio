@@ -174,8 +174,6 @@ function SingleDiscWobbleOutline({
         color={outlineColor}
         lineWidth={2.4}
         transparent
-        opacity={0}
-        visible={false}
       />
       <Line
         ref={line2Ref}
@@ -183,8 +181,6 @@ function SingleDiscWobbleOutline({
         color={outlineColor}
         lineWidth={2.4}
         transparent
-        opacity={0}
-        visible={false}
       />
     </group>
   );

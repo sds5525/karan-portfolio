@@ -1,6 +1,6 @@
 import { Suspense, useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment } from '@react-three/drei';
+import { Environment, Lightformer } from '@react-three/drei';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../../data/projects';
 import { useWorkContext } from '../Layout/Layout';
@@ -95,7 +95,12 @@ function SceneContent({
       <directionalLight position={[-5, -4, -2]} intensity={0.25} />
 
       <Suspense fallback={null}>
-        <Environment preset="studio" />
+        <Environment resolution={256}>
+          <Lightformer form="rect" intensity={2} position={[0, 4, -6]} scale={[10, 3, 1]} />
+          <Lightformer form="rect" intensity={1} position={[-6, 1, 0]} rotation-y={Math.PI / 2} scale={[8, 2, 1]} />
+          <Lightformer form="rect" intensity={1} position={[6, 1, 0]} rotation-y={-Math.PI / 2} scale={[8, 2, 1]} />
+          <Lightformer form="ring" intensity={0.6} position={[0, 0, 6]} scale={3} />
+        </Environment>
       </Suspense>
 
       {projects.map((project, i) => (

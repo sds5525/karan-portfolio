@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { Environment } from '@react-three/drei';
+import { Environment, Lightformer } from '@react-three/drei';
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -239,6 +239,7 @@ export default function ProjectView() {
   // Scroll to top on slug change
   useEffect(() => {
     window.scrollTo(0, 0);
+    nextDiscProgressRef.current = 0;
   }, [slug]);
 
   // Handle transition to next project
@@ -266,6 +267,7 @@ export default function ProjectView() {
   useEffect(() => {
     if (!project || !nextProject) return;
 
+    nextDiscProgressRef.current = 0;
     isNavigatingNextRef.current = false;
 
     // Enable normal scroll on html/body for Lenis
@@ -813,6 +815,7 @@ export default function ProjectView() {
         {/* 3D Next-project Disc Canvas */}
         <div className={styles.nextDiscCanvasWrapper}>
           <Canvas
+            key={nextProject.slug}
             dpr={[1, 2]}
             camera={{ fov: 35, position: [0, 0, 6] }}
             gl={{ alpha: true, antialias: true }}
@@ -828,9 +831,15 @@ export default function ProjectView() {
             <directionalLight position={[5, 8, 6]} intensity={0.8} />
             <directionalLight position={[-5, -4, -2]} intensity={0.25} />
             <Suspense fallback={null}>
-              <Environment preset="studio" />
+              <Environment resolution={256}>
+                <Lightformer form="rect" intensity={2} position={[0, 4, -6]} scale={[10, 3, 1]} />
+                <Lightformer form="rect" intensity={1} position={[-6, 1, 0]} rotation-y={Math.PI / 2} scale={[8, 2, 1]} />
+                <Lightformer form="rect" intensity={1} position={[6, 1, 0]} rotation-y={-Math.PI / 2} scale={[8, 2, 1]} />
+                <Lightformer form="ring" intensity={0.6} position={[0, 0, 6]} scale={3} />
+              </Environment>
             </Suspense>
             <SingleDisc
+              key={nextProject.slug}
               project={nextProject}
               progressRef={nextDiscProgressRef}
               onClick={handleNavigateToNext}

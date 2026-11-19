@@ -98,17 +98,10 @@ export function useCarousel({
     (e: WheelEvent) => {
       e.preventDefault();
       const dy = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-
-      // Scrolling up past first disc returns to home
-      if (targetRef.current < 0.05 && dy < -40) {
-        navigate('/');
-        return;
-      }
-
       targetRef.current = clamp(targetRef.current + dy * 0.0016);
       settle();
     },
-    [navigate, settle]
+    [settle]
   );
 
   const onPointerDown = useCallback((e: PointerEvent) => {
@@ -127,20 +120,13 @@ export function useCarousel({
         movedRef.current = true;
       }
 
-      // Dragging down at the first disc
-      if (targetRef.current < 0.05 && dy > 120) {
-        navigate('/');
-        downRef.current = false;
-        return;
-      }
-
       const m = Math.abs(dx) > Math.abs(dy) ? dx : dy;
       targetRef.current = clamp(targetRef.current - (m / window.innerWidth) * 1.5);
       sxRef.current = e.clientX;
       syRef.current = e.clientY;
       settle();
     },
-    [navigate, settle]
+    [settle]
   );
 
   const onPointerUp = useCallback(() => {
@@ -155,10 +141,6 @@ export function useCarousel({
         settle();
       }
       if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
-        if (targetRef.current < 0.05) {
-          navigate('/');
-          return;
-        }
         targetRef.current = clamp(Math.round(targetRef.current) - 1);
         settle();
       }
