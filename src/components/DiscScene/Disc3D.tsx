@@ -8,6 +8,8 @@ import {
   DoubleSide,
   type Group,
   type Mesh,
+  type MeshStandardMaterial,
+  type MeshPhysicalMaterial,
 } from 'three';
 import type { Project } from '../../data/projects';
 import { getDiscTexture } from './discTexture';
@@ -224,6 +226,8 @@ export function Disc3D({
   const artworkRef = useRef<Group>(null);
   const faceMeshRef = useRef<Mesh>(null);
   const rimMeshRef = useRef<Mesh>(null);
+  const hubMeshRef = useRef<Mesh>(null);
+  const edgeMeshRef = useRef<Mesh>(null);
 
   const isHoveredRef = useRef(false);
   const targetTiltX = useRef(0);
@@ -319,10 +323,10 @@ export function Disc3D({
     const a = Math.abs(d);
 
     const isMobile = window.innerWidth < 760;
-    const isHidden = isMobile ? a > 2.5 : a > 3.5;
+    const isHidden = isMobile ? a > 2.5 : (d < -3.5 || d > 1.6);
     groupRef.current.visible = !isHidden;
 
-    const R = isMobile ? viewport.width * 0.34 : Math.min(1.15, viewport.width * 0.16);
+    const R = isMobile ? viewport.width * 0.34 : 0.95;
 
     let targetX = 0;
     let targetY = 0;
@@ -346,14 +350,14 @@ export function Disc3D({
       targetRotY = -0.2 - clampD * 0.3;
       targetRotZ = 0.3;
     } else {
-      targetX = R * (d * 1.95 + 0.15);
-      targetY = R * (0.6 * d + 0.14 * d * d);
-      targetZ = R * 0.45 * Math.min(a, 2.5);
-      const baseScale = 1 - 0.05 * Math.min(a, 3);
-      targetScale = R * baseScale;
-      targetRotX = -0.55;
-      targetRotY = -0.25 - d * 0.16;
-      targetRotZ = 0.35;
+      const k = Math.min(1, (viewport.width / viewport.height) / 1.778);
+      targetX = (0.1 + 2.05 * d) * k;
+      targetY = 0.2 + 0.62 * d + 0.08 * d * d;
+      targetZ = d > 0 ? 1.0 * d : 1.35 * d;
+      targetScale = R;
+      targetRotX = -0.22;
+      targetRotY = -0.42;
+      targetRotZ = 0.30;
     }
 
     if (isHidden) {
@@ -465,6 +469,64 @@ export function Disc3D({
     groupRef.current.position.set(finalX, finalY, finalZ);
     groupRef.current.scale.set(finalScale, finalScale, finalScale);
     groupRef.current.rotation.set(finalRotX, finalRotY, finalRotZ);
+
+    // Desktop opacity fade out between d = 1.2 and 1.6, so nothing flies into the camera
+    if (!isMobile) {
+      const opacityMul = d > 1.2 ? Math.max(0, Math.min(1, (1.6 - d) / 0.4)) : 1.0;
+      if (faceMeshRef.current) {
+        const mat = faceMeshRef.current.material as MeshStandardMaterial;
+        if (mat) {
+          mat.transparent = opacityMul < 0.999;
+          mat.opacity = opacityMul;
+        }
+      }
+      if (hubMeshRef.current) {
+        const mat = hubMeshRef.current.material as MeshStandardMaterial;
+        if (mat) {
+          mat.transparent = opacityMul < 0.999;
+          mat.opacity = opacityMul;
+        }
+      }
+      if (rimMeshRef.current) {
+        const mat = rimMeshRef.current.material as MeshPhysicalMaterial;
+        if (mat) {
+          mat.opacity = 0.35 * opacityMul;
+        }
+      }
+      if (edgeMeshRef.current) {
+        const mat = edgeMeshRef.current.material as MeshPhysicalMaterial;
+        if (mat) {
+          mat.opacity = 0.5 * opacityMul;
+        }
+      }
+    } else {
+      if (faceMeshRef.current) {
+        const mat = faceMeshRef.current.material as MeshStandardMaterial;
+        if (mat && mat.transparent) {
+          mat.transparent = false;
+          mat.opacity = 1.0;
+        }
+      }
+      if (hubMeshRef.current) {
+        const mat = hubMeshRef.current.material as MeshStandardMaterial;
+        if (mat && mat.transparent) {
+          mat.transparent = false;
+          mat.opacity = 1.0;
+        }
+      }
+      if (rimMeshRef.current) {
+        const mat = rimMeshRef.current.material as MeshPhysicalMaterial;
+        if (mat) {
+          mat.opacity = 0.35;
+        }
+      }
+      if (edgeMeshRef.current) {
+        const mat = edgeMeshRef.current.material as MeshPhysicalMaterial;
+        if (mat) {
+          mat.opacity = 0.5;
+        }
+      }
+    }
 
     if (artworkRef.current) {
       if (!still) {
@@ -631,7 +693,7 @@ export function Disc3D({
         </mesh>
 
         {/* Silver hub (0.12 - 0.2, hole < 0.12 transparent) */}
-        <mesh geometry={hubGeometry} position={[0, 0, 0.001]}>
+        <mesh ref={hubMeshRef} geometry={hubGeometry} position={[0, 0, 0.001]}>
           <meshStandardMaterial
             roughness={0.25}
             metalness={1}
@@ -663,7 +725,7 @@ export function Disc3D({
         </mesh>
 
         {/* Outer edge cylinder (opacity 0.5) */}
-        <mesh geometry={edgeGeometry} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh ref={edgeMeshRef} geometry={edgeGeometry} rotation={[Math.PI / 2, 0, 0]}>
           <meshPhysicalMaterial
             roughness={0.2}
             transparent
