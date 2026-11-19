@@ -270,10 +270,12 @@ export default function ProjectView() {
     nextDiscProgressRef.current = 0;
     isNavigatingNextRef.current = false;
 
-    // Enable normal scroll on html/body for Lenis
-    document.documentElement.style.overflow = 'auto';
+    // Enable normal vertical scroll on html/body for Lenis, clip horizontal scroll
+    document.documentElement.style.overflowY = 'auto';
+    document.documentElement.style.overflowX = 'clip';
     document.documentElement.style.height = 'auto';
-    document.body.style.overflow = 'auto';
+    document.body.style.overflowY = 'auto';
+    document.body.style.overflowX = 'clip';
     document.body.style.height = 'auto';
 
     const isMobile = window.innerWidth < 760;
@@ -484,15 +486,21 @@ export default function ProjectView() {
         },
       });
 
-      lines.forEach((lineEl, idx) => {
-        const isOdd = idx % 2 === 0;
-        nextTL.fromTo(
-          lineEl,
-          { xPercent: isOdd ? 25 : -25 },
-          { xPercent: isOdd ? -25 : 25, ease: 'none' },
-          0
-        );
-      });
+      if (!isMobile) {
+        lines.forEach((lineEl, idx) => {
+          const isOdd = idx % 2 === 0;
+          nextTL.fromTo(
+            lineEl,
+            { xPercent: isOdd ? 25 : -25 },
+            { xPercent: isOdd ? -25 : 25, ease: 'none' },
+            0
+          );
+        });
+      } else {
+        lines.forEach((lineEl) => {
+          gsap.set(lineEl, { xPercent: 0 });
+        });
+      }
     }
 
     // 6. Tone ScrollTriggers per section (tone-light / tone-dark on body)
@@ -520,8 +528,12 @@ export default function ProjectView() {
       lenis.destroy();
       ScrollTrigger.getAll().forEach((t) => t.kill());
       document.documentElement.style.overflow = '';
+      document.documentElement.style.overflowX = '';
+      document.documentElement.style.overflowY = '';
       document.documentElement.style.height = '';
       document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
       document.body.style.height = '';
       document.body.classList.remove('tone-light', 'tone-dark');
       if (pageRef.current) {
@@ -537,7 +549,7 @@ export default function ProjectView() {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 760;
   const titleLines = splitTitle(project.title, isMobile);
-  const nextTitleLines = splitTitle(nextProject.title, isMobile);
+  const nextTitleLines = isMobile ? [nextProject.title] : splitTitle(nextProject.title, false);
   const quoteWords = project.quote ? project.quote.split(/\s+/) : [];
   const clipId = `torn-edge-${project.slug}`;
 
@@ -763,6 +775,31 @@ export default function ProjectView() {
         <div className={styles.summaryContainer}>
           <div className={styles.summaryLeft}>
             <p className={styles.summaryParagraph}>{project.summary}</p>
+
+            {/* Mobile: Boxed Links rendered below summary */}
+            {project.links && project.links.length > 0 && (
+              <div className={styles.summaryBoxedLinks}>
+                <div className={styles.boxedLinksBox}>
+                  <span className={`${styles.cornerCross} ${styles.crossTL}`}>+</span>
+                  <span className={`${styles.cornerCross} ${styles.crossTR}`}>+</span>
+                  <span className={`${styles.cornerCross} ${styles.crossBL}`}>+</span>
+                  <span className={`${styles.cornerCross} ${styles.crossBR}`}>+</span>
+                  <div className={styles.boxedLinksList}>
+                    {project.links.map((link, idx) => (
+                      <a
+                        key={idx}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.boxedLink}
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.summaryRight}>
@@ -796,7 +833,7 @@ export default function ProjectView() {
         <div className={styles.nextTitlesContainer} onClick={handleNavigateToNext}>
           {nextTitleLines.map((line, i) => {
             const lineTops = ['16%', '32%', '48%', '64%', '80%'];
-            const topPos = lineTops[i % 5];
+            const topPos = isMobile ? '48%' : lineTops[i % 5];
             return (
               <div
                 key={i}

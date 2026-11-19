@@ -36,7 +36,42 @@
 
 @media (max-width: 760px) {
   .info {
-    width: 56vw;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+
+  .info h1 {
+    font-family: var(--serif);
+    font-size: 20px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    margin: 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .row {
+    padding: 5px 0;
+    font-size: 12px;
+    line-height: 1.35;
+    border-top: 1px solid var(--line);
+  }
+
+  .row:first-of-type {
+    border-top: none;
+  }
+
+  .row b {
+    font: 400 9px var(--mono);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding-top: 1px;
   }
 }
 

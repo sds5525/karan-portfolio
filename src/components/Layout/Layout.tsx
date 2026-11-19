@@ -100,6 +100,12 @@ export default function Layout() {
           </div>
         ) : (
           <>
+            <Link to="/" className={styles.navBrand}>
+              MSLOTW
+            </Link>
+            <span className={styles.navDot} aria-hidden="true">
+              ·
+            </span>
             <NavLink
               to="/work"
               end
@@ -116,6 +122,9 @@ export default function Layout() {
             >
               Work
             </NavLink>
+            <span className={styles.navDot} aria-hidden="true">
+              ·
+            </span>
 
             <div
               ref={idxRef}
@@ -127,7 +136,8 @@ export default function Layout() {
                 className={styles.idxButton}
                 onClick={() => setIsIndexOpen((prev) => !prev)}
               >
-                Index ▾
+                <span className={styles.idxDesktopText}>Index ▾</span>
+                <span className={styles.idxMobileText}>Index</span>
               </button>
               <ul className={styles.idxList}>
                 {projects.map((project, i) => {

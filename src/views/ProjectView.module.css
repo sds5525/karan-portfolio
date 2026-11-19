@@ -4,7 +4,7 @@
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
-  overflow-x: hidden;
+  overflow-x: clip;
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
@@ -479,6 +479,10 @@
   color: inherit;
 }
 
+.summaryBoxedLinks {
+  display: none;
+}
+
 /* 4. Next Project Section (Grey Section, ~200vh pin) */
 .nextProjectSection {
   position: relative;
@@ -564,13 +568,17 @@
     height: 32px;
   }
 
+  .header .boxedLinksOuter {
+    display: none;
+  }
+
   .boxedLinksBox {
-    padding: 12px 18px;
+    padding: 10px 14px;
   }
 
   .boxedLink {
-    font-size: 22px;
-    padding: 4px 10px;
+    font-size: 20px;
+    padding: 4px 8px;
   }
 
   .heroRevealContainer {
@@ -579,32 +587,81 @@
   }
 
   .quoteWordPlacement {
-    left: 50% !important;
+    font-size: clamp(30px, 9vw, 44px);
+    transform: translateY(-50%);
+  }
+
+  .wordLeft {
+    left: 6% !important;
     right: auto !important;
-    transform: translate(-50%, -50%) !important;
-    text-align: center;
-    font-size: clamp(32px, 8vw, 56px);
+    text-align: left;
+  }
+
+  .wordRight {
+    right: 6% !important;
+    left: auto !important;
+    text-align: right;
   }
 
   .summarySection {
     padding: 80px 16px 60px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .summaryContainer {
     flex-direction: column;
-    gap: 36px;
+    gap: 0;
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .summaryLeft {
+    width: 100%;
+  }
+
+  .summaryParagraph {
+    font-family: var(--sans);
+    font-size: 19px;
+    line-height: 1.35;
+    max-width: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .summaryBoxedLinks {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 24px;
+    margin-bottom: 24px;
+    width: 100%;
   }
 
   .summaryRight {
+    width: 100%;
     justify-content: flex-start;
   }
 
   .recognitionList {
     text-align: left;
+    align-items: flex-start;
+  }
+
+  .recognitionItem {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant: all-small-caps;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
   }
 
   .nextTitleLine {
-    font-size: clamp(32px, 7vw, 52px);
+    font-size: clamp(28px, 8.5vw, 42px);
+    text-align: center;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    white-space: nowrap;
   }
 
   .portfolioMark {

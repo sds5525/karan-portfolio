@@ -46,6 +46,11 @@ export function useCarousel({
   const sxRef = useRef(0);
   const syRef = useRef(0);
 
+  // Touch drag tracking for mobile
+  const touchStartTargetRef = useRef(0);
+  const touchStartXRef = useRef(0);
+  const isTouchDragRef = useRef(false);
+
   // Fade in infoRef during intro or set visible
   useEffect(() => {
     const infoEl = infoRef.current;
@@ -109,29 +114,56 @@ export function useCarousel({
     movedRef.current = false;
     sxRef.current = e.clientX;
     syRef.current = e.clientY;
+
+    const isTouch = e.pointerType === 'touch' || window.innerWidth < 760;
+    if (isTouch) {
+      isTouchDragRef.current = true;
+      touchStartXRef.current = e.clientX;
+      touchStartTargetRef.current = targetRef.current;
+    } else {
+      isTouchDragRef.current = false;
+    }
   }, []);
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
       if (!downRef.current) return;
-      const dx = e.clientX - sxRef.current;
-      const dy = e.clientY - syRef.current;
-      if (Math.abs(dx) + Math.abs(dy) > 6) {
-        movedRef.current = true;
-      }
 
-      const m = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-      targetRef.current = clamp(targetRef.current - (m / window.innerWidth) * 1.5);
-      sxRef.current = e.clientX;
-      syRef.current = e.clientY;
-      settle();
+      if (isTouchDragRef.current) {
+        const totalDx = e.clientX - touchStartXRef.current;
+        if (Math.abs(totalDx) > 8) {
+          movedRef.current = true;
+        }
+        // Swiping 25% of the screen width = 1 disc (dx only, ignore dy)
+        const deltaDiscs = totalDx / (window.innerWidth * 0.25);
+        targetRef.current = clamp(touchStartTargetRef.current - deltaDiscs);
+      } else {
+        const dx = e.clientX - sxRef.current;
+        const dy = e.clientY - syRef.current;
+        if (Math.abs(dx) + Math.abs(dy) > 6) {
+          movedRef.current = true;
+        }
+
+        const m = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+        targetRef.current = clamp(targetRef.current - (m / window.innerWidth) * 1.5);
+        sxRef.current = e.clientX;
+        syRef.current = e.clientY;
+        settle();
+      }
     },
     [settle]
   );
 
   const onPointerUp = useCallback(() => {
+    if (!downRef.current) return;
     downRef.current = false;
-    settle();
+    if (isTouchDragRef.current) {
+      isTouchDragRef.current = false;
+      // On release, snap to the nearest disc
+      targetRef.current = clamp(Math.round(targetRef.current));
+    } else {
+      settle();
+    }
   }, [settle]);
 
   const onKeyDown = useCallback(

@@ -235,15 +235,18 @@ export function SingleDisc({
     if (!groupRef.current) return;
 
     const isMobile = window.innerWidth < 760;
-    // Disc diameter = 62% of viewport width on desktop, 90% on mobile
-    const diameter = isMobile ? viewport.width * 0.9 : viewport.width * 0.62;
+    // Disc diameter = 62% of viewport width on desktop, 100% on mobile
+    const diameter = isMobile ? viewport.width : viewport.width * 0.62;
     const R = diameter / 2;
 
-    // Vertical scrub: from fully below bottom edge up to where center sits at 78% of section height
+    // Vertical scrub: from fully below bottom edge up to targetCenterY
     // Top of viewport = +viewport.height / 2, Bottom = -viewport.height / 2
-    const startY = -viewport.height / 2 - R - 0.2;
-    // 78% of section height from top:
-    const targetCenterY = (0.5 - 0.78) * viewport.height;
+    const startY = -viewport.height / 2 - R - 0.5;
+    // On desktop: center sits at 78% of section height (from top)
+    // On mobile: rising until about 45% of the disc is visible above the bottom edge
+    const targetCenterY = isMobile
+      ? -viewport.height / 2 - 0.1 * R * Math.cos(0.55)
+      : (0.5 - 0.78) * viewport.height;
 
     const progress = Math.min(1, Math.max(0, progressRef.current));
     const targetY = startY + (targetCenterY - startY) * progress;

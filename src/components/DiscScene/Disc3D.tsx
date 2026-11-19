@@ -232,6 +232,14 @@ export function Disc3D({
   const curTiltY = useRef(0);
   const hoverFactor = useRef(0);
 
+  // Touch and coarse pointer refs
+  const isPressedRef = useRef(false);
+  const wasSettledRef = useRef(false);
+  const settleTimeRef = useRef(0);
+  const touchStartTimeRef = useRef(0);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const lastTapTimeRef = useRef(0);
+
   // Soft lerping position, scale, and rotation refs
   const curX = useRef(0);
   const curY = useRef(0);
@@ -309,23 +317,43 @@ export function Disc3D({
     const d = index - pos;
     const a = Math.abs(d);
 
-    const isHidden = a > 3.5;
+    const isMobile = window.innerWidth < 760;
+    const isHidden = isMobile ? a > 2.5 : a > 3.5;
     groupRef.current.visible = !isHidden;
 
-    const isMobile = window.innerWidth < 760;
-    const R = isMobile ? viewport.width * 0.3 : Math.min(1.15, viewport.width * 0.16);
+    const R = isMobile ? viewport.width * 0.34 : Math.min(1.15, viewport.width * 0.16);
 
-    // Upward (concave) arc layout
-    const targetX = isMobile ? R * d * 1.6 : R * (d * 1.95 + 0.15);
-    let targetY = isMobile
-      ? R * (0.9 * d + 0.12 * d * d)
-      : R * (0.6 * d + 0.14 * d * d);
-    const targetZ = R * 0.45 * Math.min(a, 2.5);
-    const baseScale = 1 - 0.05 * Math.min(a, 3);
-    const targetScale = R * baseScale;
-    const targetRotX = -0.55;
-    const targetRotY = -0.25 - d * 0.16;
-    const targetRotZ = 0.35;
+    let targetX = 0;
+    let targetY = 0;
+    let targetZ = 0;
+    let targetScale = 1;
+    let targetRotX = -0.55;
+    let targetRotY = -0.25;
+    let targetRotZ = 0.35;
+
+    if (isMobile) {
+      const vw = viewport.width;
+      const vh = viewport.height;
+      const s = a < 1 ? 1 - 0.58 * a : 0.42 - 0.08 * Math.min(a - 1, 2);
+      targetScale = R * s;
+      const signD = d < 0 ? -1 : d > 0 ? 1 : 0;
+      targetX = signD * (Math.min(a, 1) * vw * 0.5 + Math.max(0, a - 1) * vw * 0.16);
+      targetY = -0.08 * vh - 0.03 * vh * Math.min(a, 1);
+      targetZ = 0;
+      const clampD = Math.max(-1, Math.min(1, d));
+      targetRotX = -0.5;
+      targetRotY = -0.2 - clampD * 0.3;
+      targetRotZ = 0.3;
+    } else {
+      targetX = R * (d * 1.95 + 0.15);
+      targetY = R * (0.6 * d + 0.14 * d * d);
+      targetZ = R * 0.45 * Math.min(a, 2.5);
+      const baseScale = 1 - 0.05 * Math.min(a, 3);
+      targetScale = R * baseScale;
+      targetRotX = -0.55;
+      targetRotY = -0.25 - d * 0.16;
+      targetRotZ = 0.35;
+    }
 
     if (isHidden) {
       curX.current = targetX;
@@ -387,6 +415,24 @@ export function Disc3D({
       document.body.style.cursor = 'auto';
     }
 
+    // Settle tracking for touch devices (pointer: coarse)
+    const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    if (isCoarse) {
+      const target = targetRef.current;
+      const isWhole = Math.abs(target - Math.round(target)) < 0.001;
+      const targetIndex = Math.round(target);
+      const isSettled = isWhole && targetIndex === index && Math.abs(pos - target) < 0.02 && !movedRef.current;
+
+      if (isSettled && !wasSettledRef.current) {
+        settleTimeRef.current = performance.now();
+      }
+      wasSettledRef.current = isSettled;
+
+      if (movedRef.current) {
+        isPressedRef.current = false;
+      }
+    }
+
     const isHovered = isHoveredRef.current && a < 0.45 && !movedRef.current;
     const lerpRate = isHovered ? 0.15 : 0.08;
 
@@ -394,13 +440,13 @@ export function Disc3D({
     curTiltX.current += (targetTiltX.current - curTiltX.current) * lerpRate;
     curTiltY.current += (targetTiltY.current - curTiltY.current) * lerpRate;
 
-    // Final position: bring forward z += 0.2R and scale × 1.04 when hovered
+    // Final position: bring forward z += 0.2R and scale × 1.04 when hovered (desktop)
     const finalX = curX.current;
     const finalY = curY.current;
-    const finalZ = curZ.current + 0.2 * R * hoverFactor.current;
-    const finalScale = curScale.current * (1 + 0.04 * hoverFactor.current);
-    const finalRotX = curRotX.current + curTiltX.current * hoverFactor.current;
-    const finalRotY = curRotY.current + curTiltY.current * hoverFactor.current;
+    const finalZ = curZ.current + (isMobile ? 0 : 0.2 * (R ?? 1) * hoverFactor.current);
+    const finalScale = curScale.current * (isMobile ? 1 : 1 + 0.04 * hoverFactor.current);
+    const finalRotX = curRotX.current + (isMobile ? 0 : curTiltX.current * hoverFactor.current);
+    const finalRotY = curRotY.current + (isMobile ? 0 : curTiltY.current * hoverFactor.current);
     const finalRotZ = curRotZ.current;
 
     groupRef.current.position.set(finalX, finalY, finalZ);
@@ -414,6 +460,49 @@ export function Disc3D({
       }
     }
   });
+
+  const triggerTap = () => {
+    const now = performance.now();
+    if (now - lastTapTimeRef.current < 300) return;
+    lastTapTimeRef.current = now;
+    if (!groupRef.current?.visible) return;
+    if (movedRef.current || transitionTarget !== null) return;
+    const d = index - posRef.current;
+    const a = Math.abs(d);
+    if (a < 0.45) {
+      onSelect(project.slug, index);
+    } else {
+      targetRef.current = index;
+    }
+  };
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!groupRef.current?.visible) return;
+    if (window.matchMedia('(pointer: coarse)').matches) {
+      isPressedRef.current = true;
+    }
+    touchStartTimeRef.current = performance.now();
+    touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
+    isPressedRef.current = false;
+    if (!groupRef.current?.visible) return;
+    if (movedRef.current || transitionTarget !== null) return;
+    const elapsed = performance.now() - touchStartTimeRef.current;
+    const dist = Math.hypot(
+      e.clientX - touchStartPosRef.current.x,
+      e.clientY - touchStartPosRef.current.y
+    );
+    if (elapsed < 500 && dist < 12 && window.matchMedia('(pointer: coarse)').matches) {
+      e.stopPropagation();
+      triggerTap();
+    }
+  };
+
+  const handlePointerCancel = () => {
+    isPressedRef.current = false;
+  };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
@@ -455,20 +544,19 @@ export function Disc3D({
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (!groupRef.current?.visible) return;
     e.stopPropagation();
-    if (movedRef.current || transitionTarget !== null) return;
-    const d = index - posRef.current;
-    const a = Math.abs(d);
-    if (a < 0.45) {
-      onSelect(project.slug, index);
-    } else {
-      targetRef.current = index;
-    }
+    triggerTap();
   };
 
   const isOutlineActive = () => {
+    if (transitionTarget !== null) return false;
+    const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    if (isCoarse) {
+      const isSettledActive = performance.now() - settleTimeRef.current < 1600;
+      return isPressedRef.current || isSettledActive;
+    }
     const d = index - posRef.current;
     const a = Math.abs(d);
-    return isHoveredRef.current && a < 0.45 && !movedRef.current && transitionTarget === null;
+    return isHoveredRef.current && a < 0.45 && !movedRef.current;
   };
 
   return (
@@ -480,6 +568,9 @@ export function Disc3D({
           ref={faceMeshRef}
           geometry={faceGeometry}
           onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onPointerOver={handlePointerOver}
           onPointerMove={handlePointerMove}
           onPointerOut={handlePointerOut}
@@ -507,6 +598,9 @@ export function Disc3D({
           geometry={rimGeometry}
           position={[0, 0, 0.001]}
           onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onPointerOver={handlePointerOver}
           onPointerMove={handlePointerMove}
           onPointerOut={handlePointerOut}
