@@ -12,6 +12,17 @@
     />
   </head>
   <body>
+    <script>
+      try {
+        if (
+          location.pathname === '/' &&
+          sessionStorage.getItem('portfolio_home_intro_played') !== 'true' &&
+          !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ) {
+          document.body.classList.add('intro-active');
+        }
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

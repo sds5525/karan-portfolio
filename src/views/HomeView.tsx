@@ -21,17 +21,17 @@ export default function HomeView() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const pointWrapperRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<HomeParticles | null>(null);
   const isLeavingRef = useRef(false);
   const leavePointSceneRef = useRef<(() => void) | null>(null);
+  const settleTriggerRef = useRef<(() => void) | null>(null);
   const pointerPosRef = useRef({ x: -999, y: -999 });
 
-  const intro = !hasPlayedHomeIntro() && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const intro = !hasPlayedHomeIntro();
 
   const [positions, setPositions] = useState<Float32Array | null>(null);
   const [useFallback, setUseFallback] = useState(false);
-  const [showPointScene, setShowPointScene] = useState(!intro);
-  const [playBurst, setPlayBurst] = useState(false);
 
   const positionsRef = useRef<Float32Array | null>(null);
   positionsRef.current = positions;
@@ -55,50 +55,50 @@ export default function HomeView() {
       });
   }, []);
 
-  // 2. Setup 2D Canvas for MASALA logo glitch (or 2D fallback)
+  // 2. Setup 2D Canvas for MASALA logo sequence (and 2D portrait fallback)
   useEffect(() => {
     const canvas = canvasRef.current;
     const section = sectionRef.current;
     if (!canvas || !section) return;
 
+    if (intro) {
+      document.body.classList.add('intro-active');
+    }
+
     isLeavingRef.current = false;
     section.classList.remove(styles.leaving);
 
     const onLeaveComplete = () => {
+      document.body.classList.remove('intro-active');
       navigate('/work', { state: { fromHome: true } });
-    };
-
-    // When the 2200 ms logo intro finishes
-    const onLogoBurst = (): boolean => {
-      if (fallbackRef.current) {
-        return false; // Proceed to 2D particle portrait fallback
-      }
-
-      if (positionsRef.current) {
-        if (canvasRef.current) canvasRef.current.style.display = 'none';
-        setShowPointScene(true);
-        setPlayBurst(true);
-        return true; // HomeParticles stops
-      }
-
-      // If positions are still downloading, wait for promise then switch
-      loadSceneHi()
-        .then((pos) => {
-          setPositions(pos);
-          if (canvasRef.current) canvasRef.current.style.display = 'none';
-          setShowPointScene(true);
-          setPlayBurst(true);
-        })
-        .catch(() => {
-          setUseFallback(true);
-        });
-
-      return true;
     };
 
     if (intro || fallbackRef.current) {
       canvas.style.display = 'block';
-      const particles = new HomeParticles(canvas, onLeaveComplete, onLogoBurst);
+      const particles = new HomeParticles(canvas, {
+        onLeaveComplete,
+        onCheckReady: () => {
+          return !!(positionsRef.current && !fallbackRef.current);
+        },
+        onStartReveal: () => {
+          settleTriggerRef.current?.();
+        },
+        onRevealProgress: (ease: number) => {
+          if (pointWrapperRef.current) {
+            const h = (ease * 50).toFixed(3);
+            pointWrapperRef.current.style.clipPath = `inset(calc(50% - ${h}%) 0 calc(50% - ${h}%) 0)`;
+          }
+        },
+        onSequenceComplete: () => {
+          if (pointWrapperRef.current) {
+            pointWrapperRef.current.style.clipPath = 'none';
+          }
+          document.body.classList.remove('intro-active');
+        },
+        onFallback: () => {
+          setUseFallback(true);
+        },
+      });
       particlesRef.current = particles;
       particles.start();
     } else {
@@ -152,6 +152,7 @@ export default function HomeView() {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      document.body.classList.remove('intro-active');
       particlesRef.current?.stop();
       particlesRef.current = null;
       window.removeEventListener('resize', handleResize);
@@ -176,6 +177,7 @@ export default function HomeView() {
 
   const handleViewWorkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
+    document.body.classList.remove('intro-active');
     if (particlesRef.current && particlesRef.current.isIntroActive()) {
       navigate('/work', { state: { fromHome: true } });
     } else {
@@ -202,19 +204,28 @@ export default function HomeView() {
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
-      {/* 2D Canvas for MASALA logo glitch (and 2D portrait fallback) */}
-      <canvas ref={canvasRef} id="cv" className={styles.cv} />
-
-      {/* Three.js Point Scene */}
-      {showPointScene && positions && !useFallback && (
-        <PointScene
-          positions={positions}
-          playBurst={playBurst}
-          onLeaveComplete={() => navigate('/work', { state: { fromHome: true } })}
-          leaveRef={leavePointSceneRef}
-          pointerPosRef={pointerPosRef}
-        />
+      {/* Three.js Point Scene inside reveal wrapper */}
+      {positions && !useFallback && (
+        <div
+          ref={pointWrapperRef}
+          className={styles.pointWrapper}
+          style={{
+            clipPath: intro ? 'inset(calc(50% - 0.5px) 0 calc(50% - 0.5px) 0)' : 'none',
+          }}
+        >
+          <PointScene
+            positions={positions}
+            intro={intro}
+            settleTriggerRef={settleTriggerRef}
+            onLeaveComplete={() => navigate('/work', { state: { fromHome: true } })}
+            leaveRef={leavePointSceneRef}
+            pointerPosRef={pointerPosRef}
+          />
+        </div>
       )}
+
+      {/* 2D Canvas for MASALA logo glitch, squash, blast (and fallback) */}
+      <canvas ref={canvasRef} id="cv" className={styles.cv} />
 
       <span className={styles.hn}>Karan S Achar</span>
       <span className={styles.hr}>Creative Developer</span>

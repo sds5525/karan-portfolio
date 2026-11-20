@@ -1,9 +1,10 @@
-import { Suspense, useRef, useEffect, useState } from 'react';
+import { Suspense, useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Lightformer } from '@react-three/drei';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../../data/projects';
 import { useWorkContext } from '../Layout/Layout';
+import type { TouchGestureState } from '../../hooks/useCarousel';
 import { Disc3D } from './Disc3D';
 
 interface DiscSceneProps {
@@ -14,6 +15,7 @@ interface DiscSceneProps {
   fromHome: boolean;
   captionRef?: React.RefObject<HTMLDivElement | null>;
   onActiveIndexChange: (index: number) => void;
+  touchStateRef?: React.MutableRefObject<TouchGestureState>;
 }
 
 interface SceneContentProps extends DiscSceneProps {
@@ -29,6 +31,7 @@ function SceneContent({
   captionRef,
   introStartRef,
   onActiveIndexChange,
+  touchStateRef,
 }: SceneContentProps) {
   const navigate = useNavigate();
   const { triggerTransition } = useWorkContext();
@@ -71,22 +74,31 @@ function SceneContent({
     }
   });
 
-  const handleSelect = (slug: string, index: number) => {
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-    setTransitionTarget(index);
-    triggerTransition();
+  const handleSelect = useCallback(
+    (slug: string, index: number) => {
+      if (isTransitioningRef.current) return;
+      isTransitioningRef.current = true;
+      setTransitionTarget(index);
+      triggerTransition();
 
-    if (captionRef?.current) {
-      captionRef.current.style.transition = 'opacity 0.25s ease';
-      captionRef.current.style.opacity = '0';
+      if (captionRef?.current) {
+        captionRef.current.style.transition = 'opacity 0.25s ease';
+        captionRef.current.style.opacity = '0';
+      }
+
+      // Navigate after 600ms (when disc reaches center and scales to dot)
+      setTimeout(() => {
+        navigate(`/work/${slug}`);
+      }, 600);
+    },
+    [captionRef, navigate, triggerTransition]
+  );
+
+  useEffect(() => {
+    if (touchStateRef?.current) {
+      touchStateRef.current.onSelect = handleSelect;
     }
-
-    // Navigate after 600ms (when disc reaches center and scales to dot)
-    setTimeout(() => {
-      navigate(`/work/${slug}`);
-    }, 600);
-  };
+  }, [handleSelect, touchStateRef]);
 
   return (
     <>
@@ -115,6 +127,7 @@ function SceneContent({
           introStartRef={introStartRef}
           transitionTarget={transitionTarget}
           outlineColor="#eceae6"
+          touchStateRef={touchStateRef}
           onSelect={handleSelect}
         />
       ))}

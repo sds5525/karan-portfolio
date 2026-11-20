@@ -5,6 +5,20 @@ import { projects } from '../data/projects';
 const pad = (n: number) => String(n + 1).padStart(2, '0');
 const clamp = (v: number) => Math.max(0, Math.min(projects.length - 1, v));
 
+export interface TouchGestureState {
+  state: 'idle' | 'pending' | 'swiping' | 'holding';
+  startX: number;
+  startY: number;
+  startTime: number;
+  startTarget: number;
+  touchedIndex: number | null;
+  isCentre: boolean;
+  holdRotX: number;
+  holdRotY: number;
+  isHolding: boolean;
+  onSelect?: (slug: string, index: number) => void;
+}
+
 interface UseCarouselProps {
   workRef: React.RefObject<HTMLElement | null>;
   infoRef: React.RefObject<HTMLElement | null>;
@@ -46,10 +60,20 @@ export function useCarousel({
   const sxRef = useRef(0);
   const syRef = useRef(0);
 
-  // Touch drag tracking for mobile
-  const touchStartTargetRef = useRef(0);
-  const touchStartXRef = useRef(0);
-  const isTouchDragRef = useRef(false);
+  // Touch gesture state for mobile/coarse pointer
+  const touchStateRef = useRef<TouchGestureState>({
+    state: 'idle',
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    startTarget: 0,
+    touchedIndex: null,
+    isCentre: false,
+    holdRotX: 0,
+    holdRotY: 0,
+    isHolding: false,
+  });
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Fade in infoRef during intro or set visible
   useEffect(() => {
@@ -115,13 +139,29 @@ export function useCarousel({
     sxRef.current = e.clientX;
     syRef.current = e.clientY;
 
-    const isTouch = e.pointerType === 'touch' || window.innerWidth < 760;
+    const isTouch =
+      e.pointerType === 'touch' ||
+      window.matchMedia('(pointer: coarse)').matches ||
+      window.innerWidth < 760;
+
     if (isTouch) {
-      isTouchDragRef.current = true;
-      touchStartXRef.current = e.clientX;
-      touchStartTargetRef.current = targetRef.current;
-    } else {
-      isTouchDragRef.current = false;
+      clearTimeout(holdTimerRef.current);
+      touchStateRef.current.state = 'pending';
+      touchStateRef.current.startX = e.clientX;
+      touchStateRef.current.startY = e.clientY;
+      touchStateRef.current.startTime = performance.now();
+      touchStateRef.current.startTarget = Math.round(targetRef.current);
+      touchStateRef.current.holdRotX = 0;
+      touchStateRef.current.holdRotY = 0;
+      touchStateRef.current.isHolding = false;
+
+      // Start 150 ms timer: if finger stays still on the centre disc -> HOLD
+      holdTimerRef.current = setTimeout(() => {
+        if (touchStateRef.current.state === 'pending' && touchStateRef.current.isCentre) {
+          touchStateRef.current.state = 'holding';
+          touchStateRef.current.isHolding = true;
+        }
+      }, 150);
     }
   }, []);
 
@@ -129,14 +169,42 @@ export function useCarousel({
     (e: PointerEvent) => {
       if (!downRef.current) return;
 
-      if (isTouchDragRef.current) {
-        const totalDx = e.clientX - touchStartXRef.current;
-        if (Math.abs(totalDx) > 8) {
-          movedRef.current = true;
+      const isTouch =
+        e.pointerType === 'touch' ||
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.innerWidth < 760;
+
+      if (isTouch) {
+        const dx = e.clientX - touchStateRef.current.startX;
+        const dy = e.clientY - touchStateRef.current.startY;
+        const dist = Math.hypot(dx, dy);
+
+        if (touchStateRef.current.state === 'pending') {
+          // SWIPE: finger moves more than 10 px within the first 150 ms
+          if (dist > 10) {
+            clearTimeout(holdTimerRef.current);
+            touchStateRef.current.state = 'swiping';
+            movedRef.current = true;
+          }
         }
-        // Swiping 25% of the screen width = 1 disc (dx only, ignore dy)
-        const deltaDiscs = totalDx / (window.innerWidth * 0.25);
-        targetRef.current = clamp(touchStartTargetRef.current - deltaDiscs);
+
+        if (touchStateRef.current.state === 'swiping') {
+          // While dragging, carousel follows only a little:
+          // target = start - clamp(dx / width * 0.8, -0.35, 0.35)
+          const follow = Math.max(-0.35, Math.min(0.35, (dx / window.innerWidth) * 0.8));
+          targetRef.current = clamp(touchStateRef.current.startTarget - follow);
+        } else if (touchStateRef.current.state === 'holding') {
+          // From then on, disc tilts to follow finger and carousel doesn't move:
+          // rotY = clamp(dx / width * 2.2, -0.9, 0.9), rotX = clamp(dy / height * 2.2, -0.9, 0.9)
+          touchStateRef.current.holdRotY = Math.max(
+            -0.9,
+            Math.min(0.9, (dx / window.innerWidth) * 2.2)
+          );
+          touchStateRef.current.holdRotX = Math.max(
+            -0.9,
+            Math.min(0.9, (dy / window.innerHeight) * 2.2)
+          );
+        }
       } else {
         const dx = e.clientX - sxRef.current;
         const dy = e.clientY - syRef.current;
@@ -154,17 +222,72 @@ export function useCarousel({
     [settle]
   );
 
-  const onPointerUp = useCallback(() => {
-    if (!downRef.current) return;
-    downRef.current = false;
-    if (isTouchDragRef.current) {
-      isTouchDragRef.current = false;
-      // On release, snap to the nearest disc
-      targetRef.current = clamp(Math.round(targetRef.current));
-    } else {
-      settle();
-    }
-  }, [settle]);
+  const onPointerUp = useCallback(
+    (e: PointerEvent) => {
+      if (!downRef.current) return;
+      downRef.current = false;
+      clearTimeout(holdTimerRef.current);
+
+      const isTouch =
+        e.pointerType === 'touch' ||
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.innerWidth < 760;
+
+      if (isTouch) {
+        const elapsed = performance.now() - touchStateRef.current.startTime;
+        const dx = e.clientX - touchStateRef.current.startX;
+        const dy = e.clientY - touchStateRef.current.startY;
+        const dist = Math.hypot(dx, dy);
+
+        if (touchStateRef.current.state === 'holding') {
+          // On release, ease back (lerp 0.08) and fade the outline
+          touchStateRef.current.state = 'idle';
+          touchStateRef.current.isHolding = false;
+          touchStateRef.current.holdRotX = 0;
+          touchStateRef.current.holdRotY = 0;
+        } else if (touchStateRef.current.state === 'swiping') {
+          touchStateRef.current.state = 'idle';
+          const speed = elapsed > 0 ? Math.abs(dx) / elapsed : 0;
+          // if |dx| > 60 px or speed > 0.45 px/ms → move exactly one disc in that direction; otherwise spring back
+          if (Math.abs(dx) > 60 || speed > 0.45) {
+            const dir = dx < 0 ? 1 : -1;
+            targetRef.current = clamp(touchStateRef.current.startTarget + dir);
+          } else {
+            targetRef.current = touchStateRef.current.startTarget;
+          }
+          settle();
+          setTimeout(() => {
+            movedRef.current = false;
+          }, 80);
+        } else if (touchStateRef.current.state === 'pending') {
+          touchStateRef.current.state = 'idle';
+          // TAP (under 10 px and under 250 ms):
+          if (dist <= 10 && elapsed < 250) {
+            const touchedIdx = touchStateRef.current.touchedIndex;
+            if (touchedIdx !== null) {
+              if (touchStateRef.current.isCentre) {
+                // centre disc → open the project
+                const p = projects[touchedIdx];
+                if (p) {
+                  touchStateRef.current.onSelect?.(p.slug, touchedIdx);
+                }
+              } else {
+                // side disc → move to it
+                targetRef.current = clamp(touchedIdx);
+                settle();
+              }
+            }
+          }
+        }
+
+        touchStateRef.current.touchedIndex = null;
+        touchStateRef.current.isCentre = false;
+      } else {
+        settle();
+      }
+    },
+    [settle]
+  );
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -204,6 +327,7 @@ export function useCarousel({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('keydown', onKeyDown);
       clearTimeout(idleRef.current);
+      clearTimeout(holdTimerRef.current);
     };
   }, [workRef, onWheel, onPointerDown, onPointerMove, onPointerUp, onKeyDown]);
 
@@ -213,5 +337,6 @@ export function useCarousel({
     movedRef,
     activeIndex,
     onActiveIndexChange,
+    touchStateRef,
   };
 }

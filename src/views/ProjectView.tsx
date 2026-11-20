@@ -475,7 +475,7 @@ export default function ProjectView() {
           trigger: nextSectionRef.current,
           pin: true,
           start: 'top top',
-          end: '+=200%',
+          end: '+=120%',
           scrub: 1.0,
           onUpdate: (self) => {
             nextDiscProgressRef.current = self.progress;

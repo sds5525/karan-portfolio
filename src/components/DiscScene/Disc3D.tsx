@@ -12,6 +12,7 @@ import {
   type MeshPhysicalMaterial,
 } from 'three';
 import type { Project } from '../../data/projects';
+import type { TouchGestureState } from '../../hooks/useCarousel';
 import { getDiscTexture } from './discTexture';
 
 interface Disc3DProps {
@@ -24,6 +25,7 @@ interface Disc3DProps {
   introStartRef: React.MutableRefObject<number>;
   transitionTarget: number | null;
   outlineColor?: string;
+  touchStateRef?: React.MutableRefObject<TouchGestureState>;
   onSelect: (slug: string, index: number) => void;
 }
 
@@ -195,9 +197,9 @@ function DiscWobbleOutline({
   );
 }
 
-// Flat UV-mapped RingGeometry for CD printed face (0.17 to 0.965)
+// Flat UV-mapped RingGeometry for CD printed face (0.28 to 0.965)
 function createFaceGeometry(): RingGeometry {
-  const geo = new RingGeometry(0.17, 0.965, 96);
+  const geo = new RingGeometry(0.28, 0.965, 96);
   const pos = geo.attributes.position;
   const uvs = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
@@ -219,6 +221,7 @@ export function Disc3D({
   introStartRef,
   transitionTarget,
   outlineColor = '#eceae6',
+  touchStateRef,
   onSelect,
 }: Disc3DProps) {
   const { viewport } = useThree();
@@ -226,6 +229,7 @@ export function Disc3D({
   const artworkRef = useRef<Group>(null);
   const faceMeshRef = useRef<Mesh>(null);
   const rimMeshRef = useRef<Mesh>(null);
+  const innerLipMeshRef = useRef<Mesh>(null);
   const hubMeshRef = useRef<Mesh>(null);
   const edgeMeshRef = useRef<Mesh>(null);
 
@@ -236,30 +240,26 @@ export function Disc3D({
   const curTiltY = useRef(0);
   const hoverFactor = useRef(0);
 
-  // Touch and coarse pointer refs
-  const isPressedRef = useRef(false);
+  // Touch settle tracking
   const wasSettledRef = useRef(false);
   const settleTimeRef = useRef(0);
-  const touchStartTimeRef = useRef(0);
-  const touchStartPosRef = useRef({ x: 0, y: 0 });
-  const touchMovedFarRef = useRef(false);
-  const lastTapTimeRef = useRef(0);
 
   // Soft lerping position, scale, and rotation refs
   const curX = useRef(0);
   const curY = useRef(0);
   const curZ = useRef(0);
   const curScale = useRef(1);
-  const curRotX = useRef(-0.55);
-  const curRotY = useRef(-0.25);
-  const curRotZ = useRef(0.35);
+  const curRotX = useRef(-0.49);
+  const curRotY = useRef(-0.49);
+  const curRotZ = useRef(0);
   const initializedRef = useRef(false);
 
   const texture = useMemo(() => getDiscTexture(project), [project]);
   const faceGeometry = useMemo(() => createFaceGeometry(), []);
   const rimGeometry = useMemo(() => new RingGeometry(0.965, 1.0, 96), []);
-  const hubGeometry = useMemo(() => new RingGeometry(0.12, 0.2, 96), []);
-  const edgeGeometry = useMemo(() => new CylinderGeometry(1, 1, 0.015, 96, 1, true), []);
+  const innerLipGeometry = useMemo(() => new RingGeometry(0.14, 0.17, 96), []);
+  const hubGeometry = useMemo(() => new RingGeometry(0.17, 0.28, 96), []);
+  const edgeGeometry = useMemo(() => new CylinderGeometry(1, 1, 0.03, 96, 1, true), []);
 
   useEffect(() => {
     return () => {
@@ -314,7 +314,7 @@ export function Disc3D({
     }
   }, [transitionTarget, index]);
 
-  useFrame((_state, delta) => {
+  useFrame(() => {
     if (!groupRef.current) return;
     if (transitionTarget !== null) return;
 
@@ -323,18 +323,18 @@ export function Disc3D({
     const a = Math.abs(d);
 
     const isMobile = window.innerWidth < 760;
-    const isHidden = isMobile ? a > 2.5 : (d < -3.5 || d > 1.6);
+    const isHidden = isMobile ? a > 2.5 : (d < -3.2 || d > 1.6);
     groupRef.current.visible = !isHidden;
 
-    const R = isMobile ? viewport.width * 0.34 : 0.95;
+    const R = isMobile ? viewport.width * 0.34 : 1.235;
 
     let targetX = 0;
     let targetY = 0;
     let targetZ = 0;
     let targetScale = 1;
-    let targetRotX = -0.55;
-    let targetRotY = -0.25;
-    let targetRotZ = 0.35;
+    let targetRotX = -0.49;
+    let targetRotY = -0.49;
+    let targetRotZ = 0;
 
     if (isMobile) {
       const vw = viewport.width;
@@ -350,14 +350,14 @@ export function Disc3D({
       targetRotY = -0.2 - clampD * 0.3;
       targetRotZ = 0.3;
     } else {
-      const k = Math.min(1, (viewport.width / viewport.height) / 1.778);
-      targetX = (0.1 + 2.05 * d) * k;
-      targetY = 0.2 + 0.62 * d + 0.08 * d * d;
-      targetZ = d > 0 ? 1.0 * d : 1.35 * d;
+      const k = Math.min(1, (viewport.width / viewport.height) / 2.0);
+      targetX = (0.03 + 2.27 * d) * k;
+      targetY = 0.055 + 0.64 * d + 0.04 * d * d;
+      targetZ = d < 0 ? 1.47 * d : 0.81 * d;
       targetScale = R;
-      targetRotX = -0.22;
-      targetRotY = -0.42;
-      targetRotZ = 0.30;
+      targetRotX = -0.49 + 0.10 * Math.min(d, 0);
+      targetRotY = -0.49 - 0.275 * d;
+      targetRotZ = 0;
     }
 
     if (isHidden) {
@@ -420,9 +420,11 @@ export function Disc3D({
       document.body.style.cursor = 'auto';
     }
 
-    // Settle tracking for touch devices (pointer: coarse)
+    // Settle tracking for touch devices (pointer: coarse or width < 760)
     const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-    if (isCoarse) {
+    const isTouchDevice = isCoarse || isMobile;
+
+    if (isTouchDevice) {
       const target = targetRef.current;
       const isWhole = Math.abs(target - Math.round(target)) < 0.001;
       const targetIndex = Math.round(target);
@@ -432,36 +434,42 @@ export function Disc3D({
         settleTimeRef.current = performance.now();
       }
       wasSettledRef.current = isSettled;
-
-      if (movedRef.current) {
-        isPressedRef.current = false;
-      }
     }
 
-    const isTouchActive = isPressedRef.current && a < 0.45 && !movedRef.current && !touchMovedFarRef.current;
-    const isHoverActive = isHoveredRef.current && a < 0.45 && !movedRef.current;
-    const isActive = isHoverActive || isTouchActive;
-    const lerpRate = isActive ? 0.15 : 0.08;
+    const isHolding = Boolean(isTouchDevice && touchStateRef?.current?.isHolding && a < 0.45);
+    const isHoverActive = !isTouchDevice && isHoveredRef.current && a < 0.45 && !movedRef.current;
 
-    hoverFactor.current += ((isActive ? 1 : 0) - hoverFactor.current) * lerpRate;
-    curTiltX.current += (targetTiltX.current - curTiltX.current) * lerpRate;
-    curTiltY.current += (targetTiltY.current - curTiltY.current) * lerpRate;
+    if (isHolding && touchStateRef?.current) {
+      targetTiltX.current = touchStateRef.current.holdRotX;
+      targetTiltY.current = touchStateRef.current.holdRotY;
+      // HOLD: added to its base rotation (lerp 0.2)
+      curTiltX.current += (targetTiltX.current - curTiltX.current) * 0.2;
+      curTiltY.current += (targetTiltY.current - curTiltY.current) * 0.2;
+      hoverFactor.current += (1 - hoverFactor.current) * 0.2;
+    } else {
+      targetTiltX.current = isHoverActive ? targetTiltX.current : 0;
+      targetTiltY.current = isHoverActive ? targetTiltY.current : 0;
+      // On release, ease back (lerp 0.08)
+      const lerpRate = isHoverActive ? 0.15 : 0.08;
+      curTiltX.current += (targetTiltX.current - curTiltX.current) * lerpRate;
+      curTiltY.current += (targetTiltY.current - curTiltY.current) * lerpRate;
+      hoverFactor.current += ((isHoverActive ? 1 : 0) - hoverFactor.current) * lerpRate;
+    }
 
     // Final position: bring forward z += 0.2R and scale × 1.04 when hovered/pressed
     const finalX = curX.current;
     const finalY = curY.current;
     const finalZ = curZ.current + 0.2 * R * hoverFactor.current;
     const finalScale = curScale.current * (1 + 0.04 * hoverFactor.current);
-    let finalRotX = curRotX.current + curTiltX.current * hoverFactor.current;
-    let finalRotY = curRotY.current + curTiltY.current * hoverFactor.current;
+    let finalRotX = curRotX.current + curTiltX.current;
+    let finalRotY = curRotY.current + curTiltY.current;
     const finalRotZ = curRotZ.current;
 
-    // Idle sway on touch devices only: centre disc gently rocks
-    const isTouchDevice = isCoarse || isMobile;
+    // Idle sway on touch devices only: centre disc gently rocks when not holding
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (isTouchDevice && !still && a < 0.45) {
+    if (isTouchDevice && !still && a < 0.45 && !isHolding) {
       const t = performance.now() * 0.001;
-      const swayFactor = Math.max(0, 1 - a * 2.2);
+      const swayFactor = Math.max(0, 1 - a * 2.2) * (1 - hoverFactor.current);
       finalRotX += Math.sin(t * 0.8) * 0.05 * swayFactor;
       finalRotY += Math.cos(t * 0.6) * 0.05 * swayFactor;
     }
@@ -475,6 +483,13 @@ export function Disc3D({
       const opacityMul = d > 1.2 ? Math.max(0, Math.min(1, (1.6 - d) / 0.4)) : 1.0;
       if (faceMeshRef.current) {
         const mat = faceMeshRef.current.material as MeshStandardMaterial;
+        if (mat) {
+          mat.transparent = opacityMul < 0.999;
+          mat.opacity = opacityMul;
+        }
+      }
+      if (innerLipMeshRef.current) {
+        const mat = innerLipMeshRef.current.material as MeshStandardMaterial;
         if (mat) {
           mat.transparent = opacityMul < 0.999;
           mat.opacity = opacityMul;
@@ -507,6 +522,13 @@ export function Disc3D({
           mat.opacity = 1.0;
         }
       }
+      if (innerLipMeshRef.current) {
+        const mat = innerLipMeshRef.current.material as MeshStandardMaterial;
+        if (mat && mat.transparent) {
+          mat.transparent = false;
+          mat.opacity = 1.0;
+        }
+      }
       if (hubMeshRef.current) {
         const mat = hubMeshRef.current.material as MeshStandardMaterial;
         if (mat && mat.transparent) {
@@ -527,95 +549,43 @@ export function Disc3D({
         }
       }
     }
-
-    if (artworkRef.current) {
-      if (!still) {
-        artworkRef.current.rotation.z += 0.08 * delta;
-      }
-    }
   });
-
-  const triggerTap = () => {
-    const now = performance.now();
-    if (now - lastTapTimeRef.current < 300) return;
-    lastTapTimeRef.current = now;
-    if (!groupRef.current?.visible) return;
-    if (movedRef.current || transitionTarget !== null) return;
-    const d = index - posRef.current;
-    const a = Math.abs(d);
-    if (a < 0.45) {
-      onSelect(project.slug, index);
-    } else {
-      targetRef.current = index;
-    }
-  };
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
-    isPressedRef.current = true;
-    touchStartTimeRef.current = performance.now();
-    touchStartPosRef.current = { x: e.clientX, y: e.clientY };
-    touchMovedFarRef.current = false;
+    const isTouch =
+      e.pointerType === 'touch' ||
+      window.matchMedia('(pointer: coarse)').matches ||
+      window.innerWidth < 760;
 
-    const d = index - posRef.current;
-    const a = Math.abs(d);
-    if (a < 0.45 && groupRef.current) {
-      const local = groupRef.current.worldToLocal(e.point.clone());
-      targetTiltX.current = -local.y * 0.22;
-      targetTiltY.current = local.x * 0.22;
+    if (isTouch) {
+      const d = index - posRef.current;
+      const a = Math.abs(d);
+      if (touchStateRef?.current) {
+        touchStateRef.current.touchedIndex = index;
+        touchStateRef.current.isCentre = a < 0.45;
+      }
     }
   };
 
-  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
-    const wasPressed = isPressedRef.current;
-    isPressedRef.current = false;
-    targetTiltX.current = 0;
-    targetTiltY.current = 0;
-
-    if (!groupRef.current?.visible) return;
-    if (movedRef.current || transitionTarget !== null) return;
-    const elapsed = performance.now() - touchStartTimeRef.current;
-    const dist = Math.hypot(
-      e.clientX - touchStartPosRef.current.x,
-      e.clientY - touchStartPosRef.current.y
-    );
-    if (
-      wasPressed &&
-      elapsed < 500 &&
-      dist <= 6 &&
-      window.matchMedia('(pointer: coarse)').matches
-    ) {
-      e.stopPropagation();
-      triggerTap();
-    }
+  const handlePointerUp = () => {
+    // Touch release is handled globally on window in useCarousel
   };
 
   const handlePointerCancel = () => {
-    isPressedRef.current = false;
-    targetTiltX.current = 0;
-    targetTiltY.current = 0;
+    // Handled globally
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
+    const isTouch =
+      e.pointerType === 'touch' ||
+      window.matchMedia('(pointer: coarse)').matches ||
+      window.innerWidth < 760;
+    if (isTouch) return; // Touch movement and tilt handled by gesture recognizer
+
     const d = index - posRef.current;
     const a = Math.abs(d);
-
-    if (isPressedRef.current) {
-      const dist = Math.hypot(
-        e.clientX - touchStartPosRef.current.x,
-        e.clientY - touchStartPosRef.current.y
-      );
-      if (dist > 6) {
-        touchMovedFarRef.current = true;
-        targetTiltX.current = 0;
-        targetTiltY.current = 0;
-      } else if (a < 0.45 && groupRef.current) {
-        const local = groupRef.current.worldToLocal(e.point.clone());
-        targetTiltX.current = -local.y * 0.22;
-        targetTiltY.current = local.x * 0.22;
-      }
-    }
 
     if (a >= 0.45 || movedRef.current || transitionTarget !== null) {
       if (isHoveredRef.current) {
@@ -625,7 +595,7 @@ export function Disc3D({
     }
     e.stopPropagation();
 
-    if (groupRef.current && !isPressedRef.current) {
+    if (groupRef.current) {
       const local = groupRef.current.worldToLocal(e.point.clone());
       targetTiltX.current = -local.y * 0.22;
       targetTiltY.current = local.x * 0.22;
@@ -639,6 +609,11 @@ export function Disc3D({
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     if (!groupRef.current?.visible) return;
+    const isTouch =
+      e.pointerType === 'touch' ||
+      window.matchMedia('(pointer: coarse)').matches ||
+      window.innerWidth < 760;
+    if (isTouch) return;
     document.body.style.cursor = 'pointer';
     handlePointerMove(e);
   };
@@ -652,17 +627,35 @@ export function Disc3D({
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (!groupRef.current?.visible) return;
+    const isTouch =
+      window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760;
+    if (isTouch) return; // Touch TAP is handled by gesture recognizer
+
+    if (movedRef.current || transitionTarget !== null) return;
     e.stopPropagation();
-    triggerTap();
+    const d = index - posRef.current;
+    const a = Math.abs(d);
+    if (a < 0.45) {
+      onSelect(project.slug, index);
+    } else {
+      targetRef.current = index;
+    }
   };
 
   const isOutlineActive = () => {
     if (transitionTarget !== null) return false;
     const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-    if (isCoarse) {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 760;
+    const isTouchDevice = isCoarse || isMobile;
+
+    if (isTouchDevice) {
       const isSettledActive = performance.now() - settleTimeRef.current < 1600;
-      return isPressedRef.current || isSettledActive;
+      const isHoldingThis = Boolean(
+        touchStateRef?.current?.isHolding && Math.abs(index - posRef.current) < 0.45
+      );
+      return isHoldingThis || isSettledActive;
     }
+
     const d = index - posRef.current;
     const a = Math.abs(d);
     return isHoveredRef.current && a < 0.45 && !movedRef.current;
@@ -692,11 +685,20 @@ export function Disc3D({
           />
         </mesh>
 
-        {/* Silver hub (0.12 - 0.2, hole < 0.12 transparent) */}
+        {/* Silver hub ring 0.14 -> 0.28: inner lip 0.14 -> 0.17 and main ring 0.17 -> 0.28 */}
+        <mesh ref={innerLipMeshRef} geometry={innerLipGeometry} position={[0, 0, 0.001]}>
+          <meshStandardMaterial
+            color="#e2e4e8"
+            roughness={0.2}
+            metalness={0.9}
+            side={DoubleSide}
+          />
+        </mesh>
         <mesh ref={hubMeshRef} geometry={hubGeometry} position={[0, 0, 0.001]}>
           <meshStandardMaterial
-            roughness={0.25}
-            metalness={1}
+            color="#c9cbd0"
+            roughness={0.3}
+            metalness={0.9}
             side={DoubleSide}
           />
         </mesh>
@@ -727,7 +729,9 @@ export function Disc3D({
         {/* Outer edge cylinder (opacity 0.5) */}
         <mesh ref={edgeMeshRef} geometry={edgeGeometry} rotation={[Math.PI / 2, 0, 0]}>
           <meshPhysicalMaterial
+            color="#b9bcc2"
             roughness={0.2}
+            metalness={0.6}
             transparent
             opacity={0.5}
             side={DoubleSide}

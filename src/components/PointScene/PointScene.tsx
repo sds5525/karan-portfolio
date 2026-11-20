@@ -5,7 +5,8 @@ import gsap from 'gsap';
 
 interface PointSceneProps {
   positions: Float32Array;
-  playBurst: boolean;
+  intro: boolean;
+  settleTriggerRef?: React.MutableRefObject<(() => void) | null>;
   onLeaveComplete: () => void;
   leaveRef: React.MutableRefObject<(() => void) | null>;
   pointerPosRef?: React.MutableRefObject<{ x: number; y: number }>;
@@ -41,18 +42,15 @@ const vertexShader = /* glsl */ `
   void main() {
     vec4 rnd = hash4(float(gl_VertexID));
 
-    // 1. Initial sphere position of radius 0.4 around (0, 0.5, 0)
-    float phi = rnd.x * 6.28318530718;
-    float cosTheta = rnd.y * 2.0 - 1.0;
-    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
-    vec3 dir = vec3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
-    vec3 spherePos = vec3(0.0, 0.5, 0.0) + dir * 0.4;
+    // Gentle settle: each point starts at real position plus random offset (up to 0.15 units)
+    vec3 offset = (rnd.xyz * 2.0 - 1.0) * 0.15;
+    vec3 startPos = position + offset;
 
     float delay = rnd.z;
 
-    // Mix to real position: clamp((uIntro - delay * 0.4) / 0.6, 0.0, 1.0)
+    // Eases into place over 1.2 s (uIntro 0 -> 1, same delay-hash idea)
     float tIntro = clamp((uIntro - delay * 0.4) / 0.6, 0.0, 1.0);
-    vec3 curPos = mix(spherePos, position, tIntro);
+    vec3 curPos = mix(startPos, position, tIntro);
 
     // 2. Leave transition: points drift upward by (uLeave - delay * 0.5) * 6.0 units
     float tLeave = max(0.0, uLeave - delay * 0.5);
@@ -104,7 +102,8 @@ const fragmentShader = /* glsl */ `
 
 function PointsContent({
   positions,
-  playBurst,
+  intro,
+  settleTriggerRef,
   onLeaveComplete,
   leaveRef,
   pointerPosRef,
@@ -137,24 +136,33 @@ function PointsContent({
     () => ({
       uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) },
       uAlphaMul: { value: size.width < 760 ? 0.8 : 0.55 },
-      uIntro: { value: playBurst ? 0.0 : 1.0 },
+      uIntro: { value: intro ? 0.0 : 1.0 },
       uLeave: { value: 0.0 },
       uMouse: { value: new THREE.Vector2(-999, -999) },
       uAspect: { value: size.width / size.height },
     }),
-    [playBurst, size]
+    [intro, size]
   );
 
-  // Play burst intro if requested
+  // Expose settle animation trigger
   useEffect(() => {
-    if (!playBurst || !materialRef.current) return;
-    materialRef.current.uniforms.uIntro.value = 0.0;
-    gsap.to(materialRef.current.uniforms.uIntro, {
-      value: 1.0,
-      duration: 1.8,
-      ease: 'power3.out',
-    });
-  }, [playBurst]);
+    if (settleTriggerRef) {
+      settleTriggerRef.current = () => {
+        if (!materialRef.current) return;
+        materialRef.current.uniforms.uIntro.value = 0.0;
+        gsap.to(materialRef.current.uniforms.uIntro, {
+          value: 1.0,
+          duration: 1.2,
+          ease: 'power3.out',
+        });
+      };
+    }
+    return () => {
+      if (settleTriggerRef) {
+        settleTriggerRef.current = null;
+      }
+    };
+  }, [settleTriggerRef]);
 
   // Leave trigger
   useEffect(() => {

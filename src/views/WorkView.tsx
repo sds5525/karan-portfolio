@@ -27,7 +27,14 @@ export default function WorkView() {
   const infoRef = useRef<HTMLElement>(null);
   const captionRef = useRef<HTMLDivElement>(null);
 
-  const { posRef, targetRef, movedRef, activeIndex, onActiveIndexChange } = useCarousel({
+  const {
+    posRef,
+    targetRef,
+    movedRef,
+    activeIndex,
+    onActiveIndexChange,
+    touchStateRef,
+  } = useCarousel({
     workRef,
     infoRef,
     setCounterText,
@@ -50,6 +57,7 @@ export default function WorkView() {
         fromHome={fromHome}
         captionRef={captionRef}
         onActiveIndexChange={onActiveIndexChange}
+        touchStateRef={touchStateRef}
       />
       <div ref={captionRef} className={styles.captionOverlay}>
         {testimonials.slice(0, 2).map((t, i) => (

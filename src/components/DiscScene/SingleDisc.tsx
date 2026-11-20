@@ -187,7 +187,7 @@ function SingleDiscWobbleOutline({
 }
 
 function createFaceGeometry(): RingGeometry {
-  const geo = new RingGeometry(0.17, 0.965, 96);
+  const geo = new RingGeometry(0.28, 0.965, 96);
   const pos = geo.attributes.position;
   const uvs = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
@@ -222,8 +222,9 @@ export function SingleDisc({
   const texture = useMemo(() => getDiscTexture(project), [project]);
   const faceGeometry = useMemo(() => createFaceGeometry(), []);
   const rimGeometry = useMemo(() => new RingGeometry(0.965, 1.0, 96), []);
-  const hubGeometry = useMemo(() => new RingGeometry(0.12, 0.2, 96), []);
-  const edgeGeometry = useMemo(() => new CylinderGeometry(1, 1, 0.015, 96, 1, true), []);
+  const innerLipGeometry = useMemo(() => new RingGeometry(0.14, 0.17, 96), []);
+  const hubGeometry = useMemo(() => new RingGeometry(0.17, 0.28, 96), []);
+  const edgeGeometry = useMemo(() => new CylinderGeometry(1, 1, 0.03, 96, 1, true), []);
 
   useEffect(() => {
     return () => {
@@ -231,7 +232,7 @@ export function SingleDisc({
     };
   }, []);
 
-  useFrame((_state, delta) => {
+  useFrame(() => {
     if (!groupRef.current) return;
 
     const isMobile = window.innerWidth < 760;
@@ -249,7 +250,8 @@ export function SingleDisc({
       : (0.5 - 0.78) * viewport.height;
 
     const progress = Math.min(1, Math.max(0, progressRef.current));
-    const targetY = startY + (targetCenterY - startY) * progress;
+    const riseProgress = Math.min(1, progress / 0.8);
+    const targetY = startY + (targetCenterY - startY) * riseProgress;
 
     curY.current += (targetY - curY.current) * 0.15;
 
@@ -275,13 +277,6 @@ export function SingleDisc({
     groupRef.current.position.set(finalX, finalY, finalZ);
     groupRef.current.scale.set(finalScale, finalScale, finalScale);
     groupRef.current.rotation.set(finalRotX, finalRotY, finalRotZ);
-
-    if (artworkRef.current) {
-      const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
-      if (!still) {
-        artworkRef.current.rotation.z += 0.08 * delta;
-      }
-    }
   });
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
@@ -334,11 +329,20 @@ export function SingleDisc({
           />
         </mesh>
 
-        {/* Silver hub (0.12 - 0.2, hole < 0.12 transparent) */}
+        {/* Silver hub ring 0.14 -> 0.28: inner lip 0.14 -> 0.17 and main ring 0.17 -> 0.28 */}
+        <mesh geometry={innerLipGeometry} position={[0, 0, 0.001]}>
+          <meshStandardMaterial
+            color="#e2e4e8"
+            roughness={0.2}
+            metalness={0.9}
+            side={DoubleSide}
+          />
+        </mesh>
         <mesh geometry={hubGeometry} position={[0, 0, 0.001]}>
           <meshStandardMaterial
-            roughness={0.25}
-            metalness={1}
+            color="#c9cbd0"
+            roughness={0.3}
+            metalness={0.9}
             side={DoubleSide}
           />
         </mesh>
@@ -366,7 +370,9 @@ export function SingleDisc({
         {/* Outer edge cylinder (opacity 0.5) */}
         <mesh geometry={edgeGeometry} rotation={[Math.PI / 2, 0, 0]}>
           <meshPhysicalMaterial
+            color="#b9bcc2"
             roughness={0.2}
+            metalness={0.6}
             transparent
             opacity={0.5}
             side={DoubleSide}
