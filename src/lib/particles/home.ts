@@ -128,6 +128,19 @@ export class HomeParticles {
     return this.leaving;
   }
 
+  public skip(): void {
+    if (!this.intro || this.stage === 'done') return;
+    this.stage = 'done';
+    this.intro = false;
+    this.burst = true;
+    markHomeIntroPlayed();
+    this.ctx.clearRect(0, 0, this.W, this.H);
+    this.canvas.style.display = 'none';
+    this.options.onRevealProgress?.(1);
+    this.options.onSequenceComplete?.();
+    this.stop();
+  }
+
   private size(): void {
     this.W = window.innerWidth;
     this.H = window.innerHeight;
@@ -337,9 +350,10 @@ export class HomeParticles {
     const cx = this.W / 2;
     const cy = this.H / 2;
     const isMobile = window.innerWidth < 760;
-    const count = isMobile ? 1200 : 2500;
+    const count = isMobile ? 700 : 1400;
     const m = (this.logoPts.length / 2) | 0;
-    const halfLineWidth = (this.lw * 1.25) / 2;
+
+    const maxSpreadRad = (35 * Math.PI) / 180;
 
     this.blastParticles = [];
     for (let j = 0; j < count; j++) {
@@ -348,15 +362,19 @@ export class HomeParticles {
       const py = m > 0 ? this.logoPts[k + 1] : cy;
 
       const x = cx + (px - cx) * 1.25;
-      const y = cy + (py - cy) * 0.04 + (Math.random() - 0.5) * 3.0; // random ±1.5 px
+      const y = cy + (py - cy) * 0.04 + (Math.random() - 0.5) * 2.0;
 
       const dxFromCenter = x - cx;
-      const sgn =
-        dxFromCenter > 0 ? 1 : dxFromCenter < 0 ? -1 : Math.random() < 0.5 ? 1 : -1;
-      const distRatio = halfLineWidth > 0 ? Math.abs(dxFromCenter) / halfLineWidth : 0;
+      const goRight = dxFromCenter > 0 ? true : dxFromCenter < 0 ? false : Math.random() < 0.5;
 
-      const vx = sgn * (6 + Math.random() * 22) * (0.5 + distRatio);
-      const vy = (Math.random() - 0.5) * 1.2;
+      const angleOffset = (Math.random() * 2 - 1) * maxSpreadRad;
+      const angle = goRight ? angleOffset : Math.PI - angleOffset;
+
+      const speed = 10 + Math.pow(Math.random(), 2) * 38;
+      const driftY = (Math.random() - 0.5) * 1.2;
+
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed + driftY;
 
       this.blastParticles.push({ x, y, vx, vy });
     }
@@ -439,7 +457,7 @@ export class HomeParticles {
           g2.translate(cx, cy);
           g2.scale(scaleX, scaleY);
           g2.translate(-cx, -cy);
-          g2.shadowColor = 'rgba(170,200,255,0.9)';
+          g2.shadowColor = 'rgba(255, 255, 255, 0.6)';
           g2.shadowBlur = shadowBlur;
           g2.globalAlpha = Math.min(1, glowAlpha);
           if (this.logoC) {
@@ -472,41 +490,34 @@ export class HomeParticles {
         const g2 = this.ctx;
         g2.clearRect(0, 0, this.W, this.H);
 
-        // Reveal progress: t = 250 to 1100 ms (850 ms, power3.out)
-        const revealP = Math.min(1, elapsedBlast / 850);
+        // Reveal progress: t = 250 to 1150 ms (900 ms, power3.out)
+        const revealP = Math.min(1, elapsedBlast / 900);
         const revealEase = 1 - Math.pow(1 - revealP, 3);
         this.options.onRevealProgress?.(revealEase);
 
-        // Blast particles: fade over 800 ms (ease-out)
-        if (elapsedBlast < 800) {
-          const p = elapsedBlast / 800;
-          const alpha = Math.max(0, 1 - p * (2 - p));
+        // Blast particles: fade over 900 ms with an ease-out
+        if (elapsedBlast < 900) {
+          const p = elapsedBlast / 900;
+          const alpha = Math.max(0, 0.85 * (1 - p * (2 - p)));
 
           g2.save();
-          g2.globalCompositeOperation = 'lighter';
+          g2.fillStyle = '#ffffff';
+          g2.globalAlpha = alpha;
 
           for (let i = 0; i < this.blastParticles.length; i++) {
             const pt = this.blastParticles[i];
-            pt.vx *= 0.94;
-            pt.vy *= 0.94;
+            pt.vx *= 0.955;
+            pt.vy *= 0.955;
             pt.x += pt.vx;
             pt.y += pt.vy;
 
-            const len = 1.6 + Math.abs(pt.vx) * 0.4;
-            g2.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
-            g2.fillRect(pt.x - len / 2, pt.y - 0.8, len, 1.6);
-
-            if (i % 3 === 0) {
-              g2.globalAlpha = alpha * 0.16;
-              g2.drawImage(GL, pt.x - 16, pt.y - 16, 32, 32);
-              g2.globalAlpha = 1;
-            }
+            g2.fillRect(pt.x - 0.7, pt.y - 0.7, 1.4, 1.4);
           }
 
           g2.restore();
         }
 
-        if (elapsedBlast >= 850) {
+        if (elapsedBlast >= 900) {
           this.stage = 'done';
           this.intro = false;
           this.burst = true;

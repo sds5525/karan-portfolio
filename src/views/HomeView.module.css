@@ -41,6 +41,7 @@
   animation: fi 1.2s var(--hd, 1.6s) forwards;
   transition: opacity 0.6s ease;
   pointer-events: none;
+  z-index: 3;
 }
 
 .hn {

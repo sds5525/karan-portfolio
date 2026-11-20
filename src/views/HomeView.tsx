@@ -93,6 +93,9 @@ export default function HomeView() {
           if (pointWrapperRef.current) {
             pointWrapperRef.current.style.clipPath = 'none';
           }
+          if (canvasRef.current) {
+            canvasRef.current.style.display = 'none';
+          }
           document.body.classList.remove('intro-active');
         },
         onFallback: () => {
@@ -105,9 +108,25 @@ export default function HomeView() {
       canvas.style.display = 'none';
     }
 
+    const skipIntro = () => {
+      if (particlesRef.current && particlesRef.current.isIntroActive()) {
+        particlesRef.current.skip();
+        if (canvasRef.current) {
+          canvasRef.current.style.display = 'none';
+        }
+        if (pointWrapperRef.current) {
+          pointWrapperRef.current.style.clipPath = 'none';
+        }
+        document.body.classList.remove('intro-active');
+      }
+    };
+
     const triggerLeave = () => {
       if (isLeavingRef.current) return;
-      if (particlesRef.current && particlesRef.current.isIntroActive()) return;
+      if (particlesRef.current && particlesRef.current.isIntroActive()) {
+        skipIntro();
+        return;
+      }
 
       isLeavingRef.current = true;
       section.classList.add(styles.leaving);
@@ -122,6 +141,10 @@ export default function HomeView() {
     };
 
     const handleWheel = (e: WheelEvent) => {
+      if (particlesRef.current && particlesRef.current.isIntroActive()) {
+        if (Math.abs(e.deltaY) > 8) skipIntro();
+        return;
+      }
       if (e.deltaY > 8) triggerLeave();
     };
 
@@ -131,13 +154,28 @@ export default function HomeView() {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (particlesRef.current && particlesRef.current.isIntroActive()) {
+        if (Math.abs(ty0 - e.touches[0].clientY) > 20) skipIntro();
+        return;
+      }
       if (ty0 - e.touches[0].clientY > 40) triggerLeave();
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        skipIntro();
+        return;
+      }
       if (['ArrowDown', 'PageDown', ' '].includes(e.key)) {
         e.preventDefault();
         triggerLeave();
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (particlesRef.current && particlesRef.current.isIntroActive()) {
+        if ((e.target as HTMLElement)?.closest('a, button')) return;
+        skipIntro();
       }
     };
 
@@ -146,6 +184,7 @@ export default function HomeView() {
     };
 
     window.addEventListener('resize', handleResize);
+    section.addEventListener('pointerdown', handlePointerDown);
     section.addEventListener('wheel', handleWheel, { passive: true });
     section.addEventListener('touchstart', handleTouchStart, { passive: true });
     section.addEventListener('touchmove', handleTouchMove, { passive: true });
@@ -156,6 +195,7 @@ export default function HomeView() {
       particlesRef.current?.stop();
       particlesRef.current = null;
       window.removeEventListener('resize', handleResize);
+      section.removeEventListener('pointerdown', handlePointerDown);
       section.removeEventListener('wheel', handleWheel);
       section.removeEventListener('touchstart', handleTouchStart);
       section.removeEventListener('touchmove', handleTouchMove);
@@ -178,7 +218,11 @@ export default function HomeView() {
   const handleViewWorkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     document.body.classList.remove('intro-active');
+    if (canvasRef.current) {
+      canvasRef.current.style.display = 'none';
+    }
     if (particlesRef.current && particlesRef.current.isIntroActive()) {
+      particlesRef.current.skip();
       navigate('/work', { state: { fromHome: true } });
     } else {
       if (isLeavingRef.current) return;

@@ -21,6 +21,7 @@ const vertexShader = /* glsl */ `
   uniform float uAspect;
 
   varying float vAlpha;
+  varying float vPointSize;
 
   // Zero-trig hash for float ID
   float hash1(float p) {
@@ -60,8 +61,10 @@ const vertexShader = /* glsl */ `
     vec4 mvPosition = modelViewMatrix * vec4(curPos, 1.0);
     float distZ = max(0.001, -mvPosition.z);
 
-    // Point size in CSS pixels (so high-DPI phones don't shrink the dots)
-    gl_PointSize = clamp(2.2 * uDpr / distZ, 1.0 * uDpr, 2.6 * uDpr);
+    // Point size: compute in CSS px, then convert, with a low cap:
+    float css = clamp(2.2 / distZ, 0.8, 1.4);
+    gl_PointSize = max(1.0, css * uDpr);
+    vPointSize = gl_PointSize;
 
     // Colour alpha: clamp(1.6 / dist, 0.25, 1.0) * uAlphaMul
     float baseAlpha = clamp(1.6 / distZ, 0.25, 1.0) * uAlphaMul;
@@ -91,11 +94,15 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   varying float vAlpha;
+  varying float vPointSize;
 
   void main() {
-    // Draw round points: discard where length(gl_PointCoord - 0.5) > 0.5
-    vec2 coord = gl_PointCoord - vec2(0.5);
-    if (length(coord) > 0.5) discard;
+    // Only cut the point round when it's big enough to matter.
+    // Skip the circle discard when gl_PointSize < 3.0 and draw a hard-edged square/pixel instead. No soft falloff.
+    if (vPointSize >= 3.0) {
+      vec2 coord = gl_PointCoord - vec2(0.5);
+      if (length(coord) > 0.5) discard;
+    }
     gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
   }
 `;
@@ -135,7 +142,7 @@ function PointsContent({
   const uniforms = useMemo(
     () => ({
       uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) },
-      uAlphaMul: { value: size.width < 760 ? 0.8 : 0.55 },
+      uAlphaMul: { value: size.width < 760 ? 0.62 : 0.55 },
       uIntro: { value: intro ? 0.0 : 1.0 },
       uLeave: { value: 0.0 },
       uMouse: { value: new THREE.Vector2(-999, -999) },
@@ -233,7 +240,7 @@ function PointsContent({
       );
       materialRef.current.uniforms.uAspect.value = state.size.width / state.size.height;
       materialRef.current.uniforms.uDpr.value = Math.min(window.devicePixelRatio || 1, 2);
-      materialRef.current.uniforms.uAlphaMul.value = isMobile ? 0.8 : 0.55;
+      materialRef.current.uniforms.uAlphaMul.value = isMobile ? 0.62 : 0.55;
     }
   });
 
